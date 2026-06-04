@@ -1,4 +1,5 @@
 .mypy_cache/
+.pytest-tmp/
 .pytest_cache/
 .ruff_cache/
 .tmp/

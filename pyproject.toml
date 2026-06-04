@@ -10,7 +10,12 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Apidiom contributors" }]
-dependencies = ["click>=8,<9"]
+dependencies = [
+    "click>=8,<9",
+    "openapi-spec-validator>=0.7,<1",
+    "pydantic>=2,<3",
+    "pyyaml>=6,<7",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -34,7 +39,16 @@ addopts = "-ra -p no:cacheprovider"
 [tool.ruff]
 line-length = 88
 target-version = "py311"
-exclude = [".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tmp", ".venv", ".venv313"]
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".pytest-tmp",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".tmp",
+    ".venv",
+    ".venv313",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
@@ -44,3 +58,7 @@ python_version = "3.11"
 strict = true
 mypy_path = "src"
 packages = ["apidiom"]
+
+[[tool.mypy.overrides]]
+module = ["openapi_spec_validator", "yaml"]
+ignore_missing_imports = true
