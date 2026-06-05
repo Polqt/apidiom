@@ -59,7 +59,7 @@ def test_load_openapi_missing_file_raises_actionable_error() -> None:
 
 def test_load_openapi_invalid_yaml_raises_actionable_error() -> None:
     with pytest.raises(OpenAPIIngestError, match="Could not parse OpenAPI document"):
-        load_openapi(FIXTURES / "invalid.yaml")
+        load_openapi(FIXTURES / "invalid-openapi.txt")
 
 
 def test_load_openapi_validation_failure_raises_actionable_error() -> None:

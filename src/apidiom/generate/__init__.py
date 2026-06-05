@@ -1,0 +1,1 @@
+"""Client generation delegation."""

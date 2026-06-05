@@ -35,8 +35,22 @@ class OpenAPIIngestError(ValueError):
 
 def load_openapi(source: str | Path) -> APIClientModel:
     source_label = str(source)
+    document = load_openapi_document(source)
+    return normalize_openapi_document(document, source_label)
+
+
+def load_openapi_document(source: str | Path) -> dict[str, Any]:
+    source_label = str(source)
     raw_document = _read_source(source)
     document = _parse_document(raw_document, source_label)
+    _validate_document(document, source_label)
+    return document
+
+
+def normalize_openapi_document(
+    document: dict[str, Any],
+    source_label: str,
+) -> APIClientModel:
     _validate_document(document, source_label)
     return _normalize_document(document, source_label)
 
