@@ -32,18 +32,20 @@ template.
 apidiom generate ./openapi.yaml --output client.py --codegen builtin
 ```
 
-The default input kind is `openapi`, so no `--input-kind` flag is needed for a
-clean JSON or YAML spec.
+The default input kind is `auto`. A clean JSON or YAML OpenAPI spec is detected
+as `openapi`.
 
 ## Generate from messy docs
 
 ```bash
 apidiom generate https://docs.example.com/api \
-  --input-kind unstructured \
   --provider ollama \
   --output client.py \
   --codegen builtin
 ```
+
+Messy docs are detected as `unstructured`. Use `--input-kind openapi` or
+`--input-kind unstructured` only when you need to override detection.
 
 Use `ollama` for private docs. Use `gemini` only for public docs where the
 privacy tradeoff is acceptable.

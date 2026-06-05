@@ -12,6 +12,8 @@ def _result(
     tier: str = "builtin",
     unknowns: list[str] | None = None,
     notes: list[str] | None = None,
+    input_kind: str | None = "openapi",
+    input_kind_source: str | None = "detected",
 ) -> PipelineResult:
     return PipelineResult(
         spec={"openapi": "3.1.0"},
@@ -21,6 +23,8 @@ def _result(
         codegen_tier=tier,
         unverified_items=unknowns or [],
         notes=notes or [],
+        input_kind=input_kind,
+        input_kind_source=input_kind_source,
     )
 
 
@@ -111,6 +115,8 @@ def test_generate_json_variant_returns_agent_payload(monkeypatch) -> None:
         "unknowns": ["$.paths./pets.get.parameters[0]: type"],
         "tier": "builtin",
         "notes": ["conflict kept first value"],
+        "input_kind": "openapi",
+        "input_kind_source": "detected",
     }
 
 

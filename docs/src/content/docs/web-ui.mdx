@@ -19,7 +19,8 @@ The page accepts one input source at a time:
 - or an uploaded file
 
 It returns generated code in the browser, along with the codegen tier and any
-unverified fields.
+unverified fields. The input type dropdown defaults to `auto`, which uses the
+same conservative detection as the CLI and MCP server.
 
 ## JSON endpoint
 
@@ -30,7 +31,9 @@ Use `POST /generate?format=json` for agent or script calls. It returns:
   "code": "...",
   "unknowns": [],
   "tier": "builtin",
-  "notes": []
+  "notes": [],
+  "input_kind": "openapi",
+  "input_kind_source": "detected"
 }
 ```
 

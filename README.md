@@ -48,7 +48,6 @@ Generate from messy documentation:
 
 ```bash
 apidiom generate ./docs-page.html \
-  --input-kind unstructured \
   --provider ollama \
   --output client.py \
   --codegen builtin
@@ -67,6 +66,32 @@ The web UI is stateless: one page, no accounts, no database, no sessions, and no
 server-side output files. It calls the same `pipeline.generate_client` entry
 point as the CLI and returns either an HTMX result fragment or JSON from
 `POST /generate?format=json`.
+
+Run the MCP server:
+
+```bash
+python -m apidiom.mcp.server
+```
+
+Example MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "apidiom": {
+      "command": "python",
+      "args": ["-m", "apidiom.mcp.server"]
+    }
+  }
+}
+```
+
+The MCP `generate_client` tool accepts
+`source, provider="null", lang="python", codegen="auto", input_kind=null`
+and returns generated code, codegen tier, unverified fields, conflict notes, and
+any Gemini privacy warning. Omit `input_kind` or pass `null` for shared
+auto-detection. Use `input_kind="openapi"` or `input_kind="unstructured"` only
+when you need an explicit override.
 
 ## Providers
 

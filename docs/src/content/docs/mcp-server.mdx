@@ -1,0 +1,53 @@
+---
+title: MCP Server
+description: Connect agents to apidiom through the Model Context Protocol.
+---
+
+`apidiom` includes a stateless MCP server that exposes the same generation
+pipeline used by the CLI and web UI.
+
+Run it with:
+
+```bash
+python -m apidiom.mcp.server
+```
+
+Example MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "apidiom": {
+      "command": "python",
+      "args": ["-m", "apidiom.mcp.server"]
+    }
+  }
+}
+```
+
+## Tool
+
+`generate_client(source, provider="null", lang="python", codegen="auto", input_kind=null)`
+
+Omit `input_kind` or pass `null` for shared auto-detection. Use
+`input_kind="openapi"` or `input_kind="unstructured"` only when you need an
+explicit override. The default matches the CLI and web UI.
+
+The tool returns:
+
+- `code`: generated client code
+- `tier`: the codegen tier that ran
+- `unverified_fields`: every field `apidiom` could not verify from the docs
+- `notes`: conflict notes from merge/repair steps
+- `privacy_warning`: the Gemini warning when `provider="gemini"`
+- `input_kind`: the input kind that ran, `openapi` or `unstructured`
+- `input_kind_source`: whether the kind was `detected` or `explicit`
+- `message`: a short status message
+
+The unverified fields are always returned. They are the trust signal for agents
+as well as humans.
+
+Provider behavior matches the CLI privacy model. The default provider is
+`null`. If an agent selects `gemini`, the response includes the warning that
+Gemini free-tier data may be used for training and should only be used for
+public docs.

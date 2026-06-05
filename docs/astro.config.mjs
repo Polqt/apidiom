@@ -11,21 +11,33 @@ export default defineConfig({
     skipSitemapUntilSiteUrlExists,
     starlight({
       title: 'apidiom',
+      customCss: ['./src/styles/custom.css'],
       disable404Route: true,
       sidebar: [
         {
-          label: 'Start Here',
+          label: 'Get Started',
           items: [
             { label: 'Intro', link: '/' },
             { label: 'Quickstart', slug: 'quickstart' },
           ],
         },
         {
-          label: 'Using apidiom',
+          label: 'Concepts',
           items: [
             { label: 'Providers & Privacy', slug: 'providers-privacy' },
             { label: 'Unverified Fields', slug: 'unverified-fields' },
+          ],
+        },
+        {
+          label: 'Reference',
+          items: [
             { label: 'Web UI', slug: 'web-ui' },
+            { label: 'MCP Server', slug: 'mcp-server' },
+          ],
+        },
+        {
+          label: 'Troubleshooting',
+          items: [
             { label: 'Troubleshooting', slug: 'troubleshooting' },
           ],
         },

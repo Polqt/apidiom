@@ -11,7 +11,7 @@ from apidiom.pipeline import InputKind, Language, generate_client
 
 _PROVIDERS = ("gemini", "ollama", "null")
 _CODEGEN_MODES = ("auto", "openapi-generator", "builtin")
-_INPUT_KINDS = ("openapi", "unstructured")
+_INPUT_KINDS = ("auto", "openapi", "unstructured")
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -68,9 +68,9 @@ def check(ctx: click.Context, provider: str | None) -> None:
 @click.option(
     "--input-kind",
     type=click.Choice(_INPUT_KINDS),
-    default="openapi",
+    default="auto",
     show_default=True,
-    help="Input type to process.",
+    help="Input type to process. Auto detects OpenAPI specs conservatively.",
 )
 @click.option("--provider", type=click.Choice(_PROVIDERS), default=None)
 @click.option("--codegen", type=click.Choice(_CODEGEN_MODES), default=None)
@@ -104,6 +104,7 @@ def generate(
     """
     selected_provider = provider or ctx.obj["provider"]
     selected_codegen = codegen or ctx.obj["codegen"]
+    selected_input_kind = _input_kind_override(input_kind)
     llm_provider = get_provider(selected_provider)
 
     if selected_provider == "gemini":
@@ -119,7 +120,7 @@ def generate(
             source,
             provider=llm_provider,
             lang=cast(Language, lang),
-            input_kind=cast(InputKind, input_kind),
+            input_kind=selected_input_kind,
             codegen=cast(CodegenMode, selected_codegen),
         )
         write_output(
@@ -138,6 +139,10 @@ def generate(
 
 
 def _print_summary(result: object) -> None:
+    input_kind = getattr(result, "input_kind", None)
+    input_kind_source = getattr(result, "input_kind_source", None)
+    if input_kind_source == "detected" and input_kind is not None:
+        click.echo(f"Detected input kind: {input_kind}", err=True)
     tier = getattr(result, "codegen_tier", None) or "unknown"
     click.echo(f"Codegen tier: {tier}", err=True)
     unknowns = list(getattr(result, "unverified_items", []))
@@ -155,3 +160,9 @@ def _print_summary(result: object) -> None:
 
 def _fail(message: str) -> None:
     raise click.ClickException(message)
+
+
+def _input_kind_override(input_kind: str) -> InputKind | None:
+    if input_kind == "auto":
+        return None
+    return cast(InputKind, input_kind)

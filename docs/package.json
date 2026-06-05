@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@astrojs/starlight": "^0.36.0",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "astro": "^5.0.0"
-  },
-  "devDependencies": {}
+  }
 }

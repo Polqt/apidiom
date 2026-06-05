@@ -16,7 +16,7 @@ from apidiom.pipeline import InputKind, Language, PipelineResult
 _WEB_DIR = Path(__file__).parent
 _PROVIDERS = ("null", "gemini", "ollama")
 _CODEGEN_MODES = ("auto", "openapi-generator", "builtin")
-_INPUT_KINDS = ("openapi", "unstructured")
+_INPUT_KINDS = ("auto", "openapi", "unstructured")
 
 app = FastAPI(title="apidiom")
 app.mount("/static", StaticFiles(directory=_WEB_DIR / "static"), name="static")
@@ -45,23 +45,24 @@ async def generate(
     provider: Annotated[str, Form()] = "null",
     lang: Annotated[str, Form()] = "python",
     codegen: Annotated[str, Form()] = "auto",
-    input_kind: Annotated[str, Form()] = "openapi",
+    input_kind: Annotated[str, Form()] = "auto",
     format: str | None = None,
 ) -> Response:
     wants_json = _wants_json(request, format)
     source: str | Path | None = None
     try:
+        selected_input_kind = _input_kind_override(input_kind)
         source = await _read_source(
             source_url,
             source_file,
-            cast(InputKind, input_kind),
+            selected_input_kind,
         )
         result = _run_pipeline(
             source,
             provider=provider,
             lang=cast(Language, lang),
             codegen=cast(CodegenMode, codegen),
-            input_kind=cast(InputKind, input_kind),
+            input_kind=selected_input_kind,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         return _error_response(str(exc), wants_json)
@@ -84,7 +85,7 @@ def _run_pipeline(
     provider: str,
     lang: Language,
     codegen: CodegenMode,
-    input_kind: InputKind,
+    input_kind: InputKind | None,
 ) -> PipelineResult:
     return pipeline.generate_client(
         source,
@@ -98,7 +99,7 @@ def _run_pipeline(
 async def _read_source(
     source_url: str,
     source_file: UploadFile | None,
-    input_kind: InputKind,
+    input_kind: InputKind | None,
 ) -> str | Path:
     trimmed_url = source_url.strip()
     has_file = source_file is not None and bool(source_file.filename)
@@ -111,7 +112,7 @@ async def _read_source(
 
     uploaded = await source_file.read()
     text = uploaded.decode("utf-8")
-    if input_kind == "unstructured":
+    if input_kind != "openapi":
         return text
 
     suffix = Path(source_file.filename or "openapi.yaml").suffix or ".yaml"
@@ -132,6 +133,8 @@ def _result_payload(result: PipelineResult) -> dict[str, Any]:
         "unknowns": result.unverified_items,
         "tier": result.codegen_tier,
         "notes": result.notes,
+        "input_kind": result.input_kind,
+        "input_kind_source": result.input_kind_source,
     }
 
 
@@ -146,6 +149,8 @@ def _result_context(result: PipelineResult) -> dict[str, Any]:
         "unknown_noun": noun,
         "notes": result.notes,
         "provider_warning": result.provider_warning,
+        "input_kind": result.input_kind,
+        "input_kind_source": result.input_kind_source,
     }
 
 
@@ -176,3 +181,9 @@ def _escape(value: str) -> str:
         .replace(">", "&gt;")
         .replace('"', "&quot;")
     )
+
+
+def _input_kind_override(input_kind: str) -> InputKind | None:
+    if input_kind == "auto":
+        return None
+    return cast(InputKind, input_kind)
