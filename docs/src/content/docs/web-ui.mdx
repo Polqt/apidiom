@@ -1,0 +1,38 @@
+---
+title: Web UI
+description: Run the stateless FastAPI web UI and call its JSON endpoint.
+---
+
+Run the web UI:
+
+```bash
+uvicorn apidiom.web.app:app
+```
+
+The web UI is a thin presentation layer over `pipeline.generate_client`. It is
+stateless: no accounts, no login, no database, no sessions, no payments, and no
+server-side output files.
+
+The page accepts one input source at a time:
+
+- a URL or local path field
+- or an uploaded file
+
+It returns generated code in the browser, along with the codegen tier and any
+unverified fields.
+
+## JSON endpoint
+
+Use `POST /generate?format=json` for agent or script calls. It returns:
+
+```json
+{
+  "code": "...",
+  "unknowns": [],
+  "tier": "builtin",
+  "notes": []
+}
+```
+
+The same handler also returns JSON when the request `Accept` header includes
+`application/json`.

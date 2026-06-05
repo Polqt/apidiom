@@ -9,6 +9,14 @@ delegated to existing tools.
 
 ## Install
 
+After v0.1.0 is published to PyPI:
+
+```bash
+python -m pip install apidiom
+```
+
+For local development from this repository:
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -49,6 +57,17 @@ apidiom generate ./docs-page.html \
 With no `--output` flag, generated code is printed to stdout. Use
 `--clipboard` to copy the generated client instead.
 
+Run the thin web UI:
+
+```bash
+uvicorn apidiom.web.app:app
+```
+
+The web UI is stateless: one page, no accounts, no database, no sessions, and no
+server-side output files. It calls the same `pipeline.generate_client` entry
+point as the CLI and returns either an HTMX result fragment or JSON from
+`POST /generate?format=json`.
+
 ## Providers
 
 `--provider` accepts:
@@ -78,6 +97,23 @@ Those uncertain fields are carried through as `x-apidiom-unknown` and
 `UNVERIFIED` notes. The CLI prints a short warning summary after generation, and
 the generated code includes `# UNVERIFIED:` comments so you can inspect and
 confirm anything that was not grounded in the source docs.
+
+## Optional Deploy
+
+The included Dockerfile runs uvicorn on `0.0.0.0:$PORT`. It can deploy on a free
+Render web service or Hugging Face Spaces; free instances may sleep when idle,
+so expect roughly a one-minute cold start. Fly.io now requires a card.
+
+The separate documentation site lives in `docs/` and builds to static files with
+Astro/Starlight:
+
+```bash
+cd docs
+npm install
+npm run build
+```
+
+It can deploy for free as a static site to Cloudflare Pages or GitHub Pages.
 
 ## Development
 

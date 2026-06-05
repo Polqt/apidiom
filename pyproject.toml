@@ -8,22 +8,39 @@ version = "0.1.0"
 description = "Turn API documentation into idiomatic, type-safe API clients."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "Apidiom contributors" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
 dependencies = [
     "beautifulsoup4>=4,<5",
     "click>=8,<9",
+    "fastapi>=0.115,<1",
     "httpx>=0.28,<1",
     "jinja2>=3,<4",
     "lxml>=5,<7",
     "openapi-spec-validator>=0.7,<1",
     "pydantic>=2,<3",
     "pyperclip>=1,<2",
+    "python-multipart>=0.0.20,<1",
     "pyyaml>=6,<7",
+    "uvicorn>=0.34,<1",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "build>=1,<2",
     "datamodel-code-generator>=0.28,<1",
     "mypy>=1,<2",
     "pre-commit>=4,<5",
@@ -35,8 +52,17 @@ dev = [
 [project.scripts]
 apidiom = "apidiom.cli:main"
 
+[project.urls]
+Homepage = "https://github.com/poyhi/apidiom"
+Repository = "https://github.com/poyhi/apidiom"
+Documentation = "https://poyhi.github.io/apidiom/"
+Issues = "https://github.com/poyhi/apidiom/issues"
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+apidiom = ["web/templates/*.html", "web/static/*.css", "generate/templates/*.j2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

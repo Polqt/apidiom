@@ -5,7 +5,12 @@
 .tmp/
 .venv/
 .venv*/
+build/
+dist/
 __pycache__/
 pytest-cache-files-*/
 tests/fixtures/generated-*/
 *.egg-info/
+docs/.astro/
+docs/dist/
+docs/node_modules/

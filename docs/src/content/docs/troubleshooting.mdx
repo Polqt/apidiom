@@ -1,0 +1,45 @@
+---
+title: Troubleshooting
+description: Common errors and what to do next.
+---
+
+## Clipboard backend missing
+
+On headless Linux, `pyperclip` may not find a clipboard backend. When
+`--clipboard` is used, `apidiom` catches that failure, prints a clear message,
+and falls back to stdout.
+
+Use `--output client.py` when running in CI or a headless shell.
+
+## Java not found
+
+The primary codegen path requires Java and `openapi-generator-cli`. If either is
+missing, `--codegen auto` selects the no-Java fallback.
+
+If you force the primary path:
+
+```bash
+apidiom generate ./openapi.yaml --codegen openapi-generator --output generated-client
+```
+
+and the tool is unavailable, `apidiom` fails fast with install guidance instead
+of silently falling back.
+
+## Provider not ready
+
+Check provider readiness:
+
+```bash
+apidiom check --provider ollama
+apidiom check --provider gemini
+```
+
+For Gemini, set `GEMINI_API_KEY`. For Ollama, start the local daemon and pull
+the configured model.
+
+## Repair-loop failure
+
+When unstructured extraction produces invalid OpenAPI, `apidiom` asks the
+provider to repair the document up to three times. If validation still fails,
+the error surfaces the validator messages and saves the best candidate spec so
+you can inspect it.

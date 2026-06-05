@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>apidiom</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="intro">
+        <div>
+          <h1>apidiom</h1>
+          <p>Generate a Python httpx client from OpenAPI specs or messy API docs.</p>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <form
+          class="generator"
+          hx-post="/generate"
+          hx-target="#result"
+          hx-swap="innerHTML"
+          enctype="multipart/form-data"
+        >
+          <label>
+            URL or local path
+            <input
+              name="source_url"
+              type="text"
+              placeholder="https://example.com/openapi.yaml"
+            >
+          </label>
+
+          <label>
+            Upload docs or spec
+            <input name="source_file" type="file">
+          </label>
+
+          <div class="grid">
+            <label>
+              Input type
+              <select name="input_kind">
+                {% for input_kind in input_kinds %}
+                  <option value="{{ input_kind }}">{{ input_kind }}</option>
+                {% endfor %}
+              </select>
+            </label>
+
+            <label>
+              Provider
+              <select name="provider">
+                {% for provider in providers %}
+                  <option value="{{ provider }}">{{ provider }}</option>
+                {% endfor %}
+              </select>
+            </label>
+
+            <label>
+              Language
+              <input name="lang" type="text" value="python" readonly>
+            </label>
+
+            <label>
+              Codegen
+              <select name="codegen">
+                {% for mode in codegen_modes %}
+                  <option value="{{ mode }}">{{ mode }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+
+          <p class="privacy">{{ gemini_warning }}</p>
+
+          <button type="submit">Generate client</button>
+        </form>
+
+        <section id="result" class="result-placeholder" aria-live="polite">
+          <p>Generated code will appear here.</p>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

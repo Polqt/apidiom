@@ -1,0 +1,54 @@
+---
+title: Providers & Privacy
+description: LLM provider options and privacy behavior.
+---
+
+`--provider` accepts `null`, `gemini`, or `ollama`.
+
+## null
+
+```bash
+apidiom generate ./openapi.yaml --provider null --output client.py
+```
+
+`null` is the default provider. It makes no LLM calls and works for already
+structured OpenAPI input. If unstructured docs need extraction, `null` raises an
+actionable error telling you to choose `gemini` or `ollama`.
+
+## gemini
+
+```bash
+$env:GEMINI_API_KEY = "..."
+apidiom generate https://docs.example.com/api \
+  --input-kind unstructured \
+  --provider gemini \
+  --output client.py
+```
+
+On macOS/Linux:
+
+```bash
+export GEMINI_API_KEY="..."
+apidiom generate https://docs.example.com/api \
+  --input-kind unstructured \
+  --provider gemini \
+  --output client.py
+```
+
+Gemini reads its key from `GEMINI_API_KEY`. When Gemini is selected, `apidiom`
+prints a warning: Gemini free-tier data may be used for training; only use it
+for public docs.
+
+## ollama
+
+```bash
+apidiom generate ./docs-page.html \
+  --input-kind unstructured \
+  --provider ollama \
+  --output client.py
+```
+
+`ollama` is local/offline. It pings the local daemon and confirms the configured
+model is pulled. Use it for private docs.
+
+The default Ollama model is `llama3.1:8b`.

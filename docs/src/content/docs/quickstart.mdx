@@ -1,0 +1,56 @@
+---
+title: Quickstart
+description: Install apidiom and generate a client from a clean spec or messy docs.
+---
+
+## Install
+
+On Windows:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+```
+
+On macOS/Linux:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+```
+
+For the primary codegen path, install Java and `openapi-generator-cli`. If Java
+is not available, `apidiom` can use its no-Java fallback:
+`datamodel-code-generator` for pydantic models plus a minimal `httpx` wrapper
+template.
+
+## Generate from a clean OpenAPI spec
+
+```bash
+apidiom generate ./openapi.yaml --output client.py --codegen builtin
+```
+
+The default input kind is `openapi`, so no `--input-kind` flag is needed for a
+clean JSON or YAML spec.
+
+## Generate from messy docs
+
+```bash
+apidiom generate https://docs.example.com/api \
+  --input-kind unstructured \
+  --provider ollama \
+  --output client.py \
+  --codegen builtin
+```
+
+Use `ollama` for private docs. Use `gemini` only for public docs where the
+privacy tradeoff is acceptable.
+
+## Check a provider
+
+```bash
+apidiom check --provider ollama
+apidiom check --provider gemini
+```

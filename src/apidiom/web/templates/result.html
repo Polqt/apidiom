@@ -1,0 +1,39 @@
+<section class="result-panel">
+  {% if provider_warning %}
+    <div class="notice">{{ provider_warning }}</div>
+  {% endif %}
+
+  {% if unknown_count %}
+    <div class="warning" role="status">
+      <strong>{{ unknown_count }} {{ unknown_noun }} could not be verified from the docs.</strong>
+      <ul>
+        {% for unknown in unknowns %}
+          <li>{{ unknown }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {% if notes %}
+    <div class="notice">
+      <strong>Notes</strong>
+      <ul>
+        {% for note in notes %}
+          <li>{{ note }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <div class="result-header">
+    <div>
+      <h2>Generated client</h2>
+      <p>Codegen tier: <strong>{{ tier }}</strong></p>
+    </div>
+    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('generated-code').innerText)">
+      Copy
+    </button>
+  </div>
+
+  <pre><code id="generated-code">{{ code }}</code></pre>
+</section>

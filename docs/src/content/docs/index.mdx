@@ -1,0 +1,23 @@
+---
+title: apidiom
+description: Generate type-safe Python API clients from clean specs or messy API docs.
+---
+
+`apidiom` generates type-safe Python API clients from messy docs that have no
+OpenAPI spec, not just from already-clean OpenAPI documents.
+
+It is for developers who need a usable `httpx` client from API documentation
+they do not control: public docs pages, internal API notes, or an existing
+OpenAPI file that should be normalized and passed through client generation.
+
+The tool is conservative by design. When the input docs do not prove a field,
+`apidiom` marks it as unverified instead of guessing.
+
+## What it does today
+
+- Reads OpenAPI JSON or YAML from a file path or URL.
+- Extracts OpenAPI from unstructured docs through a selected LLM provider.
+- Validates and normalizes the spec into an internal model.
+- Delegates Python client generation to `openapi-generator-cli` when available.
+- Falls back to a pure-Python path when Java is not available.
+- Exposes the same pipeline through the CLI and a thin stateless web UI.
