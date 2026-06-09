@@ -24,17 +24,22 @@ jobs:
           python-version: "3.11"
 
       - name: Install build tooling
-        run: python -m pip install --upgrade build
+        run: python -m pip install --upgrade build twine
 
       - name: Build package
         run: python -m build
 
+      - name: Validate distributions
+        run: python -m twine check dist/*
+
       # PyPI Trusted Publishing setup required before this workflow can publish:
-      # 1. Create/claim the PyPI project named "apidiom".
-      # 2. In PyPI project settings, add a Trusted Publisher for this GitHub repo.
-      # 3. Use workflow filename ".github/workflows/release.yml".
-      # 4. Use environment name "pypi" if you keep the environment below.
-      # 5. Do not add a PyPI API token; this workflow uses GitHub OIDC.
+      # - Add a pending publisher under your PyPI account for project: apidiom
+      # - Owner/repository: poyhi/apidiom
+      # - Workflow: .github/workflows/release.yml
+      # - Environment: pypi
+      # The first successful OIDC publish creates the PyPI project and converts
+      # the pending publisher into a normal project publisher.
+      # Do not configure a PyPI API token; GitHub OIDC supplies the identity.
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:

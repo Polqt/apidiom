@@ -2,13 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## v0.1.0 - 2026-06-05
+## v0.1.0 - 2026-06-07
 
-Initial MVP release.
+Initial MVP release: generate type-safe Python clients from messy API
+documentation that has no OpenAPI spec, not only from clean specs.
 
-- Adds a Python CLI, `apidiom`, for generating Python `httpx` clients from API
-  documentation.
-- Supports validated OpenAPI JSON/YAML input from files or URLs.
+- Adds conservative auto-detection for clean OpenAPI input versus unstructured
+  documentation, with explicit overrides available in every front-end.
+- Supports validated OpenAPI JSON/YAML input from files, URLs, or inline text.
 - Adds unstructured documentation extraction through pluggable LLM providers:
   `null`, `gemini`, and local/offline `ollama`.
 - Validates extracted OpenAPI and attempts bounded repair while preserving the
@@ -19,6 +20,6 @@ Initial MVP release.
   `httpx` wrapper template.
 - Carries uncertain fields forward as `x-apidiom-unknown`, `UNVERIFIED` notes,
   CLI summaries, web warnings, and generated-code comments.
-- Includes a stateless FastAPI web UI and JSON endpoint over the same pipeline
-  used by the CLI.
+- Includes a CLI, stateless FastAPI web UI/JSON endpoint, and MCP server over
+  the same shared generation pipeline.
 - Adds a separate Astro/Starlight documentation site under `docs/`.

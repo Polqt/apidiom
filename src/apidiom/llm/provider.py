@@ -32,11 +32,23 @@ class LLMProvider(ABC):
 
 def get_provider(name: str) -> LLMProvider:
     if name == "gemini":
-        from apidiom.llm.gemini import GeminiProvider
+        try:
+            from apidiom.llm.gemini import GeminiProvider
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                "Gemini provider dependencies are not installed. "
+                "Run: pip install apidiom[gemini]"
+            ) from exc
 
         return GeminiProvider()
     if name == "ollama":
-        from apidiom.llm.ollama_provider import OllamaProvider
+        try:
+            from apidiom.llm.ollama_provider import OllamaProvider
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                "Ollama provider dependencies are not installed. "
+                "Run: pip install apidiom[ollama]"
+            ) from exc
 
         return OllamaProvider()
     if name == "null":

@@ -9,11 +9,33 @@ delegated to existing tools.
 
 ## Install
 
-After v0.1.0 is published to PyPI:
+Install the core CLI:
 
 ```bash
 python -m pip install apidiom
 ```
+
+Install only the features you need:
+
+```bash
+python -m pip install "apidiom[gemini]"
+python -m pip install "apidiom[ollama]"
+python -m pip install "apidiom[codegen]"
+python -m pip install "apidiom[web]"
+python -m pip install "apidiom[mcp]"
+```
+
+Install every optional feature:
+
+```bash
+python -m pip install "apidiom[all]"
+```
+
+The Gemini and Ollama extras provide their HTTP client dependency. The
+`codegen` extra provides the pure-Python fallback model generator. The primary
+`openapi-generator-cli` path still requires Java and the external CLI.
+
+### From source
 
 For local development from this repository:
 
@@ -31,10 +53,9 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
 
-For the primary codegen path, install Java and `openapi-generator-cli`.
-If Java is not available, `apidiom` can use its no-Java fallback:
-`datamodel-code-generator` for pydantic models plus a minimal httpx wrapper
-template.
+The development extra installs all Python dependencies needed by the test
+suite. If Java is unavailable, use `--codegen builtin` with the included
+`datamodel-code-generator` development dependency.
 
 ## Quickstart
 

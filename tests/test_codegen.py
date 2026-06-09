@@ -198,6 +198,20 @@ def test_fallback_generates_models_and_httpx_wrappers() -> None:
     assert 'client.request(\n        "POST",' in result.client_text
 
 
+def test_builtin_codegen_reports_missing_optional_dependency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spec = _small_spec()
+    model = normalize_openapi_document(spec, "test")
+    monkeypatch.setattr(shutil, "which", lambda command: None)
+
+    with pytest.raises(
+        CodegenError,
+        match=r"pip install apidiom\[codegen\]",
+    ):
+        generate_client_code(spec, model, mode="builtin")
+
+
 def test_unknowns_propagate_into_generated_code_comments() -> None:
     spec = _small_spec()
     parameter = spec["paths"]["/pets/{petId}"]["get"]["parameters"][1]

@@ -1,3 +1,4 @@
+import builtins
 from typing import Any
 
 import httpx
@@ -62,6 +63,37 @@ def test_factory_returns_correct_provider(monkeypatch: pytest.MonkeyPatch) -> No
 def test_factory_rejects_unknown_provider() -> None:
     with pytest.raises(ValueError, match="Unknown LLM provider"):
         get_provider("unknown")
+
+
+@pytest.mark.parametrize("provider_name", ["gemini", "ollama"])
+def test_factory_reports_missing_optional_provider_dependency(
+    monkeypatch: pytest.MonkeyPatch,
+    provider_name: str,
+) -> None:
+    real_import = builtins.__import__
+    provider_module = {
+        "gemini": "apidiom.llm.gemini",
+        "ollama": "apidiom.llm.ollama_provider",
+    }[provider_name]
+
+    def missing_httpx(
+        name: str,
+        globals: dict[str, Any] | None = None,
+        locals: dict[str, Any] | None = None,
+        fromlist: tuple[str, ...] = (),
+        level: int = 0,
+    ) -> Any:
+        if name == provider_module:
+            raise ModuleNotFoundError("No module named 'httpx'", name="httpx")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", missing_httpx)
+
+    with pytest.raises(
+        RuntimeError,
+        match=rf"pip install apidiom\[{provider_name}\]",
+    ):
+        get_provider(provider_name)
 
 
 def test_null_provider_complete_raises_actionable_error() -> None:

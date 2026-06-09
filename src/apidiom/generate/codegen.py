@@ -215,6 +215,11 @@ def _run_builtin_fallback(
 
 
 def _generate_models_with_datamodel_codegen(spec_json: str) -> str:
+    if shutil.which("datamodel-codegen") is None:
+        raise CodegenError(
+            "Built-in codegen dependencies are not installed. "
+            "Run: pip install apidiom[codegen]"
+        )
     with tempfile.TemporaryDirectory(prefix="apidiom-datamodel-") as temp_dir:
         input_path = Path(temp_dir) / "schemas.json"
         output_path = Path(temp_dir) / "models.py"
