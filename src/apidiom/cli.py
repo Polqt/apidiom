@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from pathlib import Path
 from typing import NoReturn, cast
 
@@ -6,19 +7,33 @@ import click
 from apidiom.config import GEMINI_PRIVACY_WARNING, readiness_reason
 from apidiom.generate.codegen import CodegenMode
 from apidiom.generate.mcp import MCPOperationSummary, validate_mcp_server_text
-from apidiom.llm.provider import get_provider
+from apidiom.generate.schema_gen import SchemaFormat
+from apidiom.llm.provider import LLMProvider, get_provider
 from apidiom.output.writer import OutputError, write_output
 from apidiom.pipeline import (
     InputKind,
     Language,
+    ToolGenerationRequest,
+    generate_agent_tools,
     generate_client,
-    generate_mcp_server,
     list_mcp_operations,
 )
 
 _PROVIDERS = ("gemini", "ollama", "null")
 _CODEGEN_MODES = ("auto", "openapi-generator", "builtin")
 _INPUT_KINDS = ("auto", "openapi", "unstructured")
+_SCHEMA_FORMATS = ("anthropic", "openai")
+
+
+@dataclass(frozen=True)
+class _ToolArgs:
+    sources: list[str]
+    include_tags: list[str]
+    include_operations: list[str]
+    check: bool = False
+    list_only: bool = False
+    enrich_docs: bool = False
+    schema_format: str = "anthropic"
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -115,7 +130,34 @@ def generate(
       apidiom generate https://example.com/openapi.yaml --output client.py
     """
     if source == "mcp":
-        _generate_mcp(ctx, output=output, clipboard=clipboard, force=force, quiet=quiet)
+        _generate_mcp(
+            ctx,
+            provider=provider,
+            output=output,
+            clipboard=clipboard,
+            force=force,
+            quiet=quiet,
+        )
+        return
+    if source == "langchain":
+        _generate_langchain(
+            ctx,
+            provider=provider,
+            output=output,
+            clipboard=clipboard,
+            force=force,
+            quiet=quiet,
+        )
+        return
+    if source == "schema":
+        _generate_schema(
+            ctx,
+            provider=provider,
+            output=output,
+            clipboard=clipboard,
+            force=force,
+            quiet=quiet,
+        )
         return
     if ctx.args:
         _fail(f"Unexpected arguments: {' '.join(ctx.args)}")
@@ -159,30 +201,34 @@ def generate(
 def _generate_mcp(
     ctx: click.Context,
     *,
+    provider: str | None,
     output: Path | None,
     clipboard: bool,
     force: bool,
     quiet: bool,
 ) -> None:
-    source, include_tags, include_operations, check, list_only = _parse_mcp_args(
-        ctx.args
-    )
+    parsed = _parse_tool_args(ctx.args, command="mcp")
     try:
-        if list_only:
+        if parsed.list_only:
             _print_mcp_operations(
                 list_mcp_operations(
-                    source,
-                    include_tags=include_tags,
-                    include_operations=include_operations,
+                    parsed.sources,
+                    include_tags=parsed.include_tags,
+                    include_operations=parsed.include_operations,
                 )
             )
             return
-        result = generate_mcp_server(
-            source,
-            include_tags=include_tags,
-            include_operations=include_operations,
+        result = generate_agent_tools(
+            ToolGenerationRequest(
+                target="mcp",
+                sources=parsed.sources,
+                include_tags=parsed.include_tags,
+                include_operations=parsed.include_operations,
+                provider=_tool_provider(ctx, provider, enrich_docs=parsed.enrich_docs),
+                enrich_docs=parsed.enrich_docs,
+            )
         )
-        if check:
+        if parsed.check:
             _print_mcp_check(result.generated_client or "")
         write_output(
             result,
@@ -199,15 +245,90 @@ def _generate_mcp(
         _print_summary(result)
 
 
-def _parse_mcp_args(args: list[str]) -> tuple[str, list[str], list[str], bool, bool]:
+def _generate_langchain(
+    ctx: click.Context,
+    *,
+    provider: str | None,
+    output: Path | None,
+    clipboard: bool,
+    force: bool,
+    quiet: bool,
+) -> None:
+    parsed = _parse_tool_args(ctx.args, command="langchain")
+    try:
+        result = generate_agent_tools(
+            ToolGenerationRequest(
+                target="langchain",
+                sources=parsed.sources,
+                include_tags=parsed.include_tags,
+                include_operations=parsed.include_operations,
+                provider=_tool_provider(ctx, provider, enrich_docs=parsed.enrich_docs),
+                enrich_docs=parsed.enrich_docs,
+            )
+        )
+        write_output(
+            result,
+            output=output,
+            clipboard=clipboard,
+            force=force,
+            stdout=click.echo,
+            stderr=lambda message: click.echo(message, err=True),
+        )
+    except (OSError, RuntimeError, ValueError, OutputError) as exc:
+        _fail(str(exc))
+
+    if not quiet:
+        _print_summary(result)
+
+
+def _generate_schema(
+    ctx: click.Context,
+    *,
+    provider: str | None,
+    output: Path | None,
+    clipboard: bool,
+    force: bool,
+    quiet: bool,
+) -> None:
+    parsed = _parse_tool_args(ctx.args, command="schema")
+    try:
+        result = generate_agent_tools(
+            ToolGenerationRequest(
+                target="schema",
+                sources=parsed.sources,
+                schema_format=cast(SchemaFormat, parsed.schema_format),
+                include_tags=parsed.include_tags,
+                include_operations=parsed.include_operations,
+                provider=_tool_provider(ctx, provider, enrich_docs=parsed.enrich_docs),
+                enrich_docs=parsed.enrich_docs,
+            )
+        )
+        write_output(
+            result,
+            output=output,
+            clipboard=clipboard,
+            force=force,
+            stdout=click.echo,
+            stderr=lambda message: click.echo(message, err=True),
+        )
+    except (OSError, RuntimeError, ValueError, OutputError) as exc:
+        _fail(str(exc))
+
+    if not quiet:
+        _print_summary(result)
+
+
+def _parse_tool_args(args: list[str], *, command: str) -> _ToolArgs:
     if not args:
-        _fail("Usage: apidiom generate mcp <openapi-spec>")
-    source = args[0]
+        _fail(f"Usage: apidiom generate {command} <openapi-spec>")
+    sources: list[str] = []
     include_tags: list[str] = []
     include_operations: list[str] = []
     check = False
     list_only = False
-    index = 1
+    enrich_docs = False
+    schema_format = "anthropic"
+    index = 0
     while index < len(args):
         arg = args[index]
         if arg == "--check":
@@ -218,7 +339,11 @@ def _parse_mcp_args(args: list[str]) -> tuple[str, list[str], list[str], bool, b
             list_only = True
             index += 1
             continue
-        if arg in {"--tag", "--include"}:
+        if arg == "--enrich-docs":
+            enrich_docs = True
+            index += 1
+            continue
+        if arg in {"--tag", "--include", "--format"}:
             if index + 1 >= len(args):
                 _fail(f"{arg} requires a value")
             value = args[index + 1]
@@ -231,14 +356,56 @@ def _parse_mcp_args(args: list[str]) -> tuple[str, list[str], list[str], bool, b
             value = arg.removeprefix("--include=")
             arg = "--include"
             index += 1
+        elif arg.startswith("--format="):
+            value = arg.removeprefix("--format=")
+            arg = "--format"
+            index += 1
         else:
-            _fail(f"Unexpected MCP argument: {arg}")
+            if arg.startswith("-"):
+                _fail(f"Unexpected {command} argument: {arg}")
+            sources.append(arg)
+            index += 1
+            continue
 
         if arg == "--tag":
             include_tags.append(value)
-        else:
+        elif arg == "--include":
             include_operations.append(value)
-    return source, include_tags, include_operations, check, list_only
+        else:
+            if value not in _SCHEMA_FORMATS:
+                _fail("--format must be 'anthropic' or 'openai'")
+            schema_format = value
+    if not sources:
+        _fail(f"Usage: apidiom generate {command} <openapi-spec>")
+    return _ToolArgs(
+        sources=sources,
+        include_tags=include_tags,
+        include_operations=include_operations,
+        check=check,
+        list_only=list_only,
+        enrich_docs=enrich_docs,
+        schema_format=schema_format,
+    )
+
+
+def _tool_provider(
+    ctx: click.Context,
+    provider: str | None,
+    *,
+    enrich_docs: bool,
+) -> LLMProvider | None:
+    if not enrich_docs:
+        return None
+    selected_provider = provider or ctx.obj["provider"]
+    if selected_provider == "null":
+        _fail("--enrich-docs needs --provider gemini or --provider ollama")
+    llm_provider = get_provider(selected_provider)
+    if not llm_provider.is_available():
+        _fail(
+            f"Provider {selected_provider} is not ready: "
+            f"{readiness_reason(selected_provider)}"
+        )
+    return llm_provider
 
 
 def _print_mcp_operations(operations: list[MCPOperationSummary]) -> None:

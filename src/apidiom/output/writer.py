@@ -56,6 +56,9 @@ def _write_path(result: PipelineResult, *, output: Path, force: bool) -> None:
         _write_directory(files, output=output, force=force)
         return
     if result.codegen_tier == "mcp" and "README.md" in files:
+        if output.exists() and output.is_dir() or (not output.suffix):
+            _write_directory(files, output=output, force=force)
+            return
         readme_output = output.parent / "README.md"
         if readme_output.exists() and not force:
             raise OutputError(

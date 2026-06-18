@@ -47,6 +47,58 @@ Use `--include METHOD:/path/{param}` or `--tag name` for large specs.
 `--check` compiles the generated server and prints the exported tool count
 without calling the API.
 
+## Generate other agent tool formats
+
+```bash
+apidiom generate langchain ./openapi.yaml --tag pets --output pet_tools.py
+apidiom generate schema ./openapi.yaml --format openai --output tools.json
+apidiom generate schema ./openapi.yaml --format anthropic
+```
+
+Use multiple specs when one agent needs tools from more than one API:
+
+```bash
+apidiom generate mcp ./stripe.yaml ./github.yaml --output unified_mcp
+```
+
+LangGraph uses LangChain tools directly, so the same output works for both:
+
+```python
+from pet_tools import list_pets
+
+tools = [list_pets]
+```
+
+Real public spec smoke checks used during development:
+
+```bash
+apidiom generate langchain \
+  https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json \
+  --include GET:/repos/{owner}/{repo} \
+  --output github_tools.py
+
+apidiom generate schema \
+  https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json \
+  --format anthropic \
+  --include POST:/v1/payment_intents \
+  --output stripe_tools.json
+```
+
+Expected generated tool names from those specs: `repos_get` and
+`post_payment_intents`.
+
+If you only know an API base URL, apidiom tries common OpenAPI locations:
+
+```bash
+apidiom generate mcp https://api.example.com --output api_mcp.py
+```
+
+For sparse specs, enrich generated tool descriptions with an LLM provider:
+
+```bash
+apidiom --provider ollama generate mcp ./openapi.yaml --enrich-docs --output api_mcp.py
+```
+
 ## Generate from messy docs
 
 ```bash

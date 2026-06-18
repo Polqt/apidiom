@@ -85,6 +85,29 @@ def test_writer_writes_mcp_readme_next_to_server() -> None:
     _clean(readme)
 
 
+def test_writer_writes_mcp_directory_output() -> None:
+    output = Path("tests/fixtures/generated-mcp-dir")
+    _clean(output)
+
+    write_output(
+        _result(
+            text="server",
+            files={
+                "server.py": "server",
+                "README.md": "python <generated-server-file>",
+            },
+            tier="mcp",
+        ),
+        output=output,
+    )
+
+    assert (output / "server.py").read_text(encoding="utf-8") == "server"
+    assert (output / "README.md").read_text(encoding="utf-8") == (
+        "python <generated-server-file>"
+    )
+    _clean(output)
+
+
 def test_writer_writes_multi_file_directory() -> None:
     output = Path("tests/fixtures/generated-client-dir")
     _clean(output)

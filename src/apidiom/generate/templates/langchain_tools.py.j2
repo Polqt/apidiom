@@ -4,12 +4,10 @@ import os
 from typing import Any
 
 import httpx
-from mcp.server.fastmcp import FastMCP
+from langchain_core.tools import tool
 
 DEFAULT_BASE_URL = "{{ default_base_url }}"
 API_BASE_URL = os.environ.get("APIDIOM_API_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
-
-mcp = FastMCP("{{ server_name }}")
 
 
 def _request_json(
@@ -40,7 +38,7 @@ def _request_json(
 
 
 {% for endpoint in endpoints %}
-@mcp.tool()
+@tool
 def {{ endpoint.function_name }}(
 {% for parameter in endpoint.parameters %}
     {{ parameter.safe_name }}: {{ parameter.annotation }}{% if not parameter.required %} | None = None{% endif %},
@@ -107,5 +105,3 @@ def {{ endpoint.function_name }}(
 
 
 {% endfor %}
-if __name__ == "__main__":
-    mcp.run()

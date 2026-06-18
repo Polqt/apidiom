@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,10 +7,9 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from apidiom.generate.codegen import _function_name, _safe_identifier
+from apidiom.generate.codegen import _function_name
 from apidiom.generate.endpoint_utils import (
     AuthHeader,
-    OperationSummary,
     ToolParameter,
     auth_headers,
     default_base_url,
@@ -19,7 +17,6 @@ from apidiom.generate.endpoint_utils import (
     extract_body_params,
     include_endpoint,
     operation_base_url,
-    operation_tags,
     path_expression,
     template_parameter,
 )
@@ -32,7 +29,7 @@ DescriptionEnricher = Callable[[APIEndpoint], str]
 
 
 @dataclass(frozen=True)
-class _MCPEndpoint:
+class _LangChainEndpoint:
     function_name: str
     method: str
     base_url: str
@@ -46,16 +43,7 @@ class _MCPEndpoint:
     auth_headers: list[AuthHeader]
 
 
-@dataclass(frozen=True)
-class MCPServerCheck:
-    tool_count: int
-    env_vars: list[str]
-
-
-MCPOperationSummary = OperationSummary
-
-
-def generate_mcp_server(
+def generate_langchain_tools(
     spec: dict[str, Any],
     model: APIClientModel,
     *,
@@ -63,7 +51,6 @@ def generate_mcp_server(
     include_operations: list[str] | None = None,
     enricher: DescriptionEnricher | None = None,
 ) -> str:
-    """Generate a runnable Python MCP server for an OpenAPI model."""
     endpoints = [
         endpoint
         for endpoint in model.endpoints
@@ -75,56 +62,21 @@ def generate_mcp_server(
         )
     ]
     if not endpoints:
-        raise ValueError("No OpenAPI endpoints matched MCP filters.")
+        raise ValueError("No OpenAPI endpoints matched LangChain filters.")
     template = Environment(
         loader=FileSystemLoader(_TEMPLATE_DIR),
         undefined=StrictUndefined,
         trim_blocks=True,
         lstrip_blocks=True,
-    ).get_template("mcp_server.py.j2")
-    server_text = template.render(
-        server_name=_safe_identifier(model.title),
+    ).get_template("langchain_tools.py.j2")
+    tools_text = template.render(
         default_base_url=default_base_url(spec),
         endpoints=[
             _template_endpoint(endpoint, model, spec=spec, enricher=enricher)
             for endpoint in endpoints
         ],
     )
-    return f"{server_text.rstrip()}\n"
-
-
-def list_mcp_operations(
-    spec: dict[str, Any],
-    model: APIClientModel,
-    *,
-    include_tags: list[str] | None = None,
-    include_operations: list[str] | None = None,
-) -> list[MCPOperationSummary]:
-    """List MCP operation selectors available for generation."""
-    return [
-        OperationSummary(
-            selector=f"{endpoint.method}:{endpoint.path}",
-            function_name=_function_name(endpoint),
-            description=description(endpoint),
-            tags=operation_tags(endpoint, spec),
-        )
-        for endpoint in model.endpoints
-        if include_endpoint(
-            endpoint,
-            spec,
-            include_tags=include_tags or [],
-            include_operations=include_operations or [],
-        )
-    ]
-
-
-def validate_mcp_server_text(server_text: str) -> MCPServerCheck:
-    compile(server_text, "generated_mcp_server.py", "exec")
-    env_vars = sorted(set(re.findall(r'os\.environ\.get\("([^"]+)"', server_text)))
-    return MCPServerCheck(
-        tool_count=server_text.count("@mcp.tool()"),
-        env_vars=env_vars,
-    )
+    return f"{tools_text.rstrip()}\n"
 
 
 def _template_endpoint(
@@ -133,7 +85,7 @@ def _template_endpoint(
     *,
     spec: dict[str, Any],
     enricher: DescriptionEnricher | None = None,
-) -> _MCPEndpoint:
+) -> _LangChainEndpoint:
     path_parameters = [
         template_parameter(parameter) for parameter in endpoint.path_parameters
     ]
@@ -147,7 +99,7 @@ def _template_endpoint(
     )
     body_params = extract_body_params(endpoint.request_schema)
     has_body = endpoint.request_schema is not None and not body_params
-    return _MCPEndpoint(
+    return _LangChainEndpoint(
         function_name=_function_name(endpoint),
         method=endpoint.method,
         base_url=operation_base_url(endpoint, spec),
@@ -167,19 +119,7 @@ def _template_endpoint(
 def _body_hint(endpoint: APIEndpoint) -> str | None:
     if endpoint.request_schema is None:
         return None
-    summary = _schema_summary(endpoint.request_schema.value)
-    return f"Body schema: {summary}."
-
-
-def _schema_summary(schema: dict[str, Any]) -> str:
-    ref = schema.get("$ref")
-    if isinstance(ref, str):
-        return ref.rsplit("/", 1)[-1]
-    properties = schema.get("properties")
-    if isinstance(properties, dict) and properties:
-        names = ", ".join(str(name) for name in properties)
-        return f"object with properties: {names}"
-    schema_type = schema.get("type")
+    schema_type = endpoint.request_schema.value.get("type")
     if isinstance(schema_type, str):
-        return schema_type
-    return "unconstrained JSON object"
+        return f"Body schema: {schema_type}."
+    return "Body schema: unconstrained JSON object."

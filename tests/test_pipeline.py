@@ -1,8 +1,17 @@
 import json
 from typing import Any
 
+from apidiom.ingest.openapi_ingest import normalize_openapi_document
 from apidiom.llm.provider import LLMProvider, LLMResponse
-from apidiom.pipeline import detect_input_kind, generate_client, generate_mcp_server
+from apidiom.pipeline import (
+    ToolGenerationRequest,
+    detect_input_kind,
+    generate_agent_tools,
+    generate_client,
+    generate_langchain_tools,
+    generate_mcp_server,
+    generate_tool_schema,
+)
 
 
 class FakeProvider(LLMProvider):
@@ -108,6 +117,89 @@ def test_pipeline_passes_mcp_filters() -> None:
     assert "def list_pets(" not in result.generated_client
 
 
+def test_pipeline_generates_langchain_tools_from_openapi_spec() -> None:
+    result = generate_langchain_tools("tests/fixtures/petstore.yaml")
+
+    assert result.generated_client is not None
+    assert result.codegen_tier == "langchain"
+    assert "from langchain_core.tools import tool" in result.generated_client
+    assert "def list_pets(" in result.generated_client
+
+
+def test_pipeline_generates_openai_tool_schema() -> None:
+    result = generate_tool_schema(
+        "tests/fixtures/petstore.yaml",
+        schema_format="openai",
+        include_operations=["GET:/pets/{petId}"],
+    )
+
+    assert result.generated_client is not None
+    assert result.codegen_tier == "schema:openai"
+    assert '"type": "function"' in result.generated_client
+    assert '"name": "get_pet"' in result.generated_client
+
+
+def test_pipeline_generates_agent_tools_from_request() -> None:
+    result = generate_agent_tools(
+        ToolGenerationRequest(
+            target="schema",
+            sources="tests/fixtures/petstore.yaml",
+            schema_format="openai",
+            include_operations=["GET:/pets/{petId}"],
+        )
+    )
+
+    assert result.generated_client is not None
+    assert result.codegen_tier == "schema:openai"
+    assert '"name": "get_pet"' in result.generated_client
+
+
+def test_pipeline_generates_mcp_server_from_multiple_specs() -> None:
+    result = generate_mcp_server(
+        ["tests/fixtures/petstore.yaml", "tests/fixtures/petstore.yaml"],
+        include_operations=["GET:/pets"],
+    )
+
+    assert result.generated_client is not None
+    assert result.model.title == "merged"
+    assert result.generated_client.count("def list_pets(") == 1
+
+
+def test_pipeline_merged_mcp_keeps_per_spec_base_urls() -> None:
+    first = {
+        "openapi": "3.1.0",
+        "info": {"title": "First", "version": "1.0.0"},
+        "servers": [{"url": "https://first.example.test"}],
+        "paths": {
+            "/pets": {
+                "get": {
+                    "operationId": "listPets",
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    }
+    second = {
+        "openapi": "3.1.0",
+        "info": {"title": "Second", "version": "1.0.0"},
+        "servers": [{"url": "https://second.example.test"}],
+        "paths": {
+            "/users": {
+                "get": {
+                    "operationId": "listUsers",
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    }
+
+    result = generate_mcp_server([json.dumps(first), json.dumps(second)])
+
+    assert result.generated_client is not None
+    assert "https://first.example.test" in result.generated_client
+    assert "https://second.example.test" in result.generated_client
+
+
 def test_pipeline_mcp_generation_tolerates_real_world_spec_validation_noise() -> None:
     spec = {
         "openapi": "3.1.0",
@@ -138,6 +230,35 @@ def test_pipeline_mcp_generation_tolerates_real_world_spec_validation_noise() ->
 
     assert result.generated_client is not None
     assert "def list_deployments(" in result.generated_client
+
+
+def test_pipeline_discovers_openapi_spec_from_base_url(monkeypatch) -> None:
+    calls: list[str] = []
+    spec = {
+        "openapi": "3.1.0",
+        "info": {"title": "Discovered API", "version": "1.0.0"},
+        "paths": {"/pets": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    }
+
+    def fake_discover(source: str) -> str:
+        calls.append(source)
+        return "https://api.example.test/openapi.json"
+
+    monkeypatch.setattr("apidiom.pipeline.discover_openapi_spec", fake_discover)
+    monkeypatch.setattr(
+        "apidiom.pipeline.load_openapi_document",
+        lambda *args, **kwargs: spec,
+    )
+    monkeypatch.setattr(
+        "apidiom.pipeline.load_openapi",
+        lambda *args, **kwargs: normalize_openapi_document(spec, "discovered"),
+    )
+
+    result = generate_mcp_server("https://api.example.test")
+
+    assert calls == ["https://api.example.test"]
+    assert result.generated_client is not None
+    assert "FastMCP" in result.generated_client
 
 
 def test_pipeline_unstructured_docs_returns_code_unknowns_and_tier() -> None:
