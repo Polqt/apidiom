@@ -26,6 +26,7 @@ class LLMProvider(ABC):
         temperature: float = 0.0,
         max_tokens: int = 4096,
         json_mode: bool = False,
+        response_schema: dict[str, Any] | None = None,
     ) -> LLMResponse:
         """Single completion. Implementations own their retry/backoff."""
 

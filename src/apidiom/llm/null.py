@@ -1,3 +1,5 @@
+from typing import Any
+
 from apidiom.llm.provider import LLMProvider, LLMResponse
 
 
@@ -15,6 +17,7 @@ class NullProvider(LLMProvider):
         temperature: float = 0.0,
         max_tokens: int = 4096,
         json_mode: bool = False,
+        response_schema: dict[str, Any] | None = None,
     ) -> LLMResponse:
         raise RuntimeError(
             "This input needs an LLM. Re-run with --provider gemini or "

@@ -1,75 +1,648 @@
-@import '@fontsource/inter/400.css';
-@import '@fontsource/inter/500.css';
-@import '@fontsource/inter/600.css';
-@import '@fontsource/inter/700.css';
 @import '@fontsource/jetbrains-mono/400.css';
 @import '@fontsource/jetbrains-mono/600.css';
+@import '@fontsource/jetbrains-mono/700.css';
 
 :root {
-  --sl-font: 'Inter';
+  --sl-font: 'JetBrains Mono';
   --sl-font-mono: 'JetBrains Mono';
 
-  /* Dark mode: warm charcoal, not blue-black. */
-  --sl-color-white: #f8f4ee;
-  --sl-color-gray-1: #e8e4de;
-  --sl-color-gray-2: #d1cbc2;
-  --sl-color-gray-3: #a9a095;
-  --sl-color-gray-4: #7c7369;
-  --sl-color-gray-5: #4d4740;
-  --sl-color-gray-6: #22201d;
-  --sl-color-black: #1a1917;
+  /* Dark mode: pure monochrome. */
+  --sl-color-white: #f0f0f0;
+  --sl-color-gray-1: #d8d8d8;
+  --sl-color-gray-2: #b8b8b8;
+  --sl-color-gray-3: #888888;
+  --sl-color-gray-4: #555555;
+  --sl-color-gray-5: #333333;
+  --sl-color-gray-6: #1a1a1a;
+  --sl-color-black: #000000;
 
-  --sl-color-bg: #1a1917;
-  --sl-color-bg-sidebar: #22201d;
-  --sl-color-bg-nav: #22201d;
-  --sl-color-bg-inline-code: #2c2925;
-  --sl-color-bg-accent: #e4cabb;
-  --sl-color-text: #e8e4de;
-  --sl-color-text-accent: #e4cabb;
-  --sl-color-text-invert: #1a1917;
-  --sl-color-hairline-light: #3a352f;
-  --sl-color-hairline: #2f2b27;
-  --sl-color-hairline-shade: #171614;
+  --sl-color-bg: #000000;
+  --sl-color-bg-sidebar: #0a0a0a;
+  --sl-color-bg-nav: #0a0a0a;
+  --sl-color-bg-inline-code: #141414;
+  --sl-color-bg-accent: #cccccc;
+  --sl-color-text: #d8d8d8;
+  --sl-color-text-accent: #cccccc;
+  --sl-color-text-invert: #000000;
+  --sl-color-hairline-light: #252525;
+  --sl-color-hairline: #1a1a1a;
+  --sl-color-hairline-shade: #0d0d0d;
 
-  --sl-color-accent-low: #3d2c25;
-  --sl-color-accent: #c99a80;
-  --sl-color-accent-high: #e4cabb;
+  --sl-color-accent-low: #222222;
+  --sl-color-accent: #aaaaaa;
+  --sl-color-accent-high: #d0d0d0;
 
-  --sl-content-width: 47rem;
-  --sl-line-height: 1.78;
+  --sl-content-width: 44rem;
+  --sl-line-height: 1.8;
+  --sl-text-body: 0.82rem;
   --sl-shadow-sm: none;
   --sl-shadow-md: none;
   --sl-shadow-lg: none;
 }
 
 :root[data-theme='light'] {
-  --sl-color-white: #1a1917;
-  --sl-color-gray-1: #1a1917;
-  --sl-color-gray-2: #34312d;
-  --sl-color-gray-3: #5d574f;
-  --sl-color-gray-4: #8a8379;
-  --sl-color-gray-5: #bbb6af;
-  --sl-color-gray-6: #dcd9d4;
-  --sl-color-gray-7: #f5f3f0;
-  --sl-color-black: #f5f3f0;
+  --sl-color-white: #111111;
+  --sl-color-gray-1: #111111;
+  --sl-color-gray-2: #333333;
+  --sl-color-gray-3: #555555;
+  --sl-color-gray-4: #888888;
+  --sl-color-gray-5: #b8b8b8;
+  --sl-color-gray-6: #e0e0e0;
+  --sl-color-gray-7: #f8f8f8;
+  --sl-color-black: #f8f8f8;
 
-  --sl-color-bg: #f5f3f0;
-  --sl-color-bg-sidebar: #eae8e6;
-  --sl-color-bg-nav: #eae8e6;
-  --sl-color-bg-inline-code: #e8e3dc;
-  --sl-color-bg-accent: #8a5539;
-  --sl-color-text: #1a1917;
-  --sl-color-text-accent: #7b4d35;
-  --sl-color-text-invert: #fff8ef;
-  --sl-color-hairline-light: #e7e3de;
-  --sl-color-hairline: #dcd9d4;
-  --sl-color-hairline-shade: #ccc7bf;
+  --sl-color-bg: #f8f8f8;
+  --sl-color-bg-sidebar: #f0f0f0;
+  --sl-color-bg-nav: #f0f0f0;
+  --sl-color-bg-inline-code: #e8e8e8;
+  --sl-color-bg-accent: #333333;
+  --sl-color-text: #111111;
+  --sl-color-text-accent: #333333;
+  --sl-color-text-invert: #f8f8f8;
+  --sl-color-hairline-light: #e0e0e0;
+  --sl-color-hairline: #d0d0d0;
+  --sl-color-hairline-shade: #c0c0c0;
 
-  --sl-color-accent-low: #ead8cd;
-  --sl-color-accent: #8a5539;
-  --sl-color-accent-high: #5a3322;
+  --sl-color-accent-low: #e8e8e8;
+  --sl-color-accent: #555555;
+  --sl-color-accent-high: #222222;
 }
 
 :focus-visible {
   outline-color: var(--sl-color-accent);
+}
+
+/* ── terminal-core: flatten sidebar bg to body bg ────────── */
+:root {
+  --sl-color-bg:          #000000;
+  --sl-color-bg-sidebar:  #000000;
+  --sl-color-bg-nav:      #000000;
+  --sl-color-bg-inline-code: #141414;
+  --sl-color-hairline:    #1a1a1a;
+  --sl-color-hairline-light: #252525;
+  --sl-color-hairline-shade: #0a0a0a;
+  --sl-color-gray-6:      #0a0a0a;
+  --sl-color-black:       #000000;
+}
+
+:root[data-theme='light'] {
+  --sl-color-bg:          #f8f8f8;
+  --sl-color-bg-sidebar:  #f8f8f8;
+  --sl-color-bg-nav:      #f8f8f8;
+  --sl-color-bg-inline-code: #eeeeee;
+  --sl-color-hairline:    #d0d0d0;
+  --sl-color-hairline-light: #c0c0c0;
+  --sl-color-hairline-shade: #d8d8d8;
+  --sl-color-gray-6:      #f0f0f0;
+  --sl-color-black:       #f8f8f8;
+}
+
+/* ── typography: monospace everywhere ────────────────────── */
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+.sl-markdown-content h4,
+.sl-markdown-content h5,
+.sl-markdown-content h6 {
+  font-family: var(--sl-font-mono);
+  letter-spacing: -0.02em;
+}
+
+/* ── nav ─────────────────────────────────────────────────── */
+header.header {
+  --sl-nav-height: 56px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: rgba(0, 0, 0, 0.92) !important;
+  border-bottom: 1px solid var(--sl-color-hairline) !important;
+}
+
+:root[data-theme='light'] header.header {
+  background: rgba(248, 248, 248, 0.92) !important;
+}
+
+/* breathing room around search + theme toggle */
+.right-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-right: 0.5rem;
+}
+
+site-search button,
+site-search [role='button'] {
+  padding: 0.35rem 0.65rem !important;
+}
+
+starlight-theme-select select,
+starlight-theme-select button {
+  padding: 0.3rem 0.5rem !important;
+}
+
+/* ── zero border-radius everywhere ───────────────────────── */
+.sl-badge,
+.sl-badge.default,
+.sl-badge.note,
+.sl-badge.tip,
+.sl-badge.caution,
+.sl-badge.danger,
+.sl-badge.success,
+starlight-aside,
+.expressive-code .frame,
+.expressive-code pre,
+.expressive-code .copy,
+details.sl-details,
+details.sl-details summary,
+.pagination-links a,
+.right-sidebar-panel,
+input[type='search'] {
+  border-radius: 0 !important;
+}
+
+/* ── sidebar ──────────────────────────────────────────────── */
+.sidebar-content {
+  font-family: var(--sl-font-mono);
+  font-size: 0.72rem;
+}
+
+.sidebar-content .group-label span {
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sl-color-gray-3);
+}
+
+.sidebar-content a {
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  border-radius: 0;
+}
+
+/* ── callouts / asides ────────────────────────────────────── */
+starlight-aside {
+  border: none !important;
+  border-left: 2px solid var(--sl-color-accent) !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0.75rem 1rem;
+}
+
+starlight-aside.note   { border-left-color: var(--sl-color-accent)  !important; }
+starlight-aside.tip    { border-left-color: #4a9 !important; }
+starlight-aside.caution{ border-left-color: #888888 !important; }
+starlight-aside.danger { border-left-color: #d06060 !important; }
+
+starlight-aside .title {
+  font-family: var(--sl-font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ── content panel: ensure right breathing room ───────────── */
+.content-panel {
+  min-width: 0;
+  overflow-x: clip;
+  padding-right: 2rem;
+}
+
+/* ── code blocks ──────────────────────────────────────────── */
+.expressive-code {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.expressive-code .frame {
+  border-color: var(--sl-color-hairline-light) !important;
+  box-shadow: none !important;
+  overflow-x: auto;
+}
+
+.expressive-code pre {
+  overflow-x: auto !important;
+  max-width: 100%;
+}
+
+.expressive-code .frame::before {
+  content: '';
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--sl-color-accent), transparent);
+  opacity: 0.4;
+  margin-bottom: -1px;
+}
+
+.expressive-code .header {
+  border-bottom-color: var(--sl-color-hairline) !important;
+  background: var(--sl-color-bg-sidebar) !important;
+}
+
+/* ── pagination: bracket style ────────────────────────────── */
+.pagination-links a {
+  border: 1px solid var(--sl-color-hairline-light);
+  font-family: var(--sl-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  background: transparent;
+  transition: border-color 0.12s, color 0.12s;
+}
+
+.pagination-links a:hover {
+  border-color: var(--sl-color-accent);
+  background: transparent;
+}
+
+
+/* ── anchor link icon ─────────────────────────────────────── */
+/* Override Starlight's inline negative-margin trick — use absolute positioning instead
+   so the icon always sits at the right edge regardless of h2::before pseudo content. */
+.sl-markdown-content .sl-heading-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.sl-markdown-content .sl-heading-wrapper > :first-child {
+  /* cancel Starlight's end-padding that was reserved for the inline icon */
+  padding-inline-end: 0 !important;
+  display: block !important;
+  flex: 1;
+}
+.sl-markdown-content .sl-anchor-link {
+  position: static;
+  margin-inline-start: 0.5em !important;
+  flex-shrink: 0;
+  align-self: center;
+  display: inline-flex !important;
+  align-items: center;
+  opacity: 0 !important;
+  transition: opacity 0.15s;
+  color: var(--sl-color-gray-4);
+}
+.sl-markdown-content .sl-heading-wrapper:hover .sl-anchor-link {
+  opacity: 0.5 !important;
+}
+.sl-markdown-content .sl-anchor-link:focus {
+  opacity: 0.5 !important;
+}
+
+/* ── inline code ──────────────────────────────────────────── */
+.sl-markdown-content :not(pre) > code {
+  color: var(--sl-color-white);
+  background: var(--sl-color-bg-inline-code);
+  border: 1px solid var(--sl-color-hairline-light);
+  border-radius: 0;
+  font-size: 0.82em;
+  padding: 0.1em 0.35em;
+}
+
+/* ── body text ────────────────────────────────────────────── */
+.sl-markdown-content {
+  font-size: 0.82rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sl-markdown-content p,
+.sl-markdown-content li {
+  color: var(--sl-color-gray-2);
+}
+
+/* ── heading prefixes: terminal comment style ─────────────── */
+.sl-markdown-content h1 {
+  font-size: 1.1rem;
+  letter-spacing: -0.02em;
+  border-bottom: 1px solid var(--sl-color-hairline);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1.5rem;
+  color: var(--sl-color-white);
+}
+
+.sl-markdown-content h2 {
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sl-color-gray-3);
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+}
+.sl-markdown-content h2::before {
+  content: '// ';
+  color: var(--sl-color-gray-5);
+  font-weight: 400;
+  display: inline;
+  vertical-align: baseline;
+}
+
+.sl-markdown-content h3 {
+  font-size: 0.82rem;
+  color: var(--sl-color-gray-2);
+  margin-top: 1.75rem;
+  margin-bottom: 0.6rem;
+}
+.sl-markdown-content h3::before {
+  content: '→ ';
+  color: var(--sl-color-gray-4);
+  font-weight: 400;
+}
+
+.sl-markdown-content h4 {
+  font-size: 0.78rem;
+  color: var(--sl-color-gray-3);
+}
+.sl-markdown-content h4::before {
+  content: '·· ';
+  color: var(--sl-color-gray-5);
+  font-weight: 400;
+}
+
+/* ── page title: PageTitle.astro renders <h1 id="_top"> ────── */
+h1#_top {
+  font-family: var(--sl-font-mono) !important;
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+  color: var(--sl-color-white) !important;
+  line-height: 1.4 !important;
+  margin-top: 0.75rem !important;
+}
+
+h1#_top::before {
+  content: '> ';
+  color: var(--sl-color-gray-3);
+  font-weight: 400;
+}
+
+/* Hero.astro variant (hero: frontmatter) also has data-page-title */
+h1[data-page-title] {
+  font-family: var(--sl-font-mono) !important;
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+  color: var(--sl-color-white) !important;
+  line-height: 1.4 !important;
+}
+
+h1[data-page-title]::before {
+  content: '> ';
+  color: var(--sl-color-gray-3);
+  font-weight: 400;
+}
+
+/* page description / tagline under title */
+.hero .tagline {
+  font-family: var(--sl-font-mono) !important;
+  font-size: 0.76rem !important;
+  color: var(--sl-color-gray-3) !important;
+  line-height: 1.7 !important;
+}
+
+/* ── breadcrumbs ──────────────────────────────────────────── */
+nav.breadcrumbs {
+  font-family: var(--sl-font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+}
+
+nav.breadcrumbs ol li + li::before {
+  content: '/';
+  color: var(--sl-color-gray-5);
+}
+
+/* ── site title in nav ────────────────────────────────────── */
+.site-title {
+  font-family: var(--sl-font-mono) !important;
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.03em !important;
+  color: var(--sl-color-white) !important;
+  text-decoration: none !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+}
+
+.site-title::before {
+  content: '>';
+  color: var(--sl-color-gray-3);
+  font-weight: 400;
+  margin-right: 0.4rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.site-title svg,
+.site-title img {
+  display: none !important;
+}
+
+/* suppress any Starlight span wrapper color override */
+.site-title span {
+  color: inherit !important;
+  font-weight: inherit !important;
+}
+
+/* ── left sidebar: border line only, no fill ─────────────── */
+.sidebar-pane {
+  border-right: 1px solid var(--sl-color-hairline) !important;
+  background: var(--sl-color-bg) !important;
+}
+
+/* ── sidebar content ──────────────────────────────────────── */
+.sidebar-content {
+  font-size: 0.72rem;
+  padding-top: 0.75rem;
+}
+
+.sidebar-content .group-label span {
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sl-color-gray-3);
+}
+
+.sidebar-content .group-label span::before {
+  content: '// ';
+  font-weight: 400;
+}
+
+/* caret + summary alignment handled by SidebarSublist.astro component override */
+
+.sidebar-content ul {
+  padding-left: 0 !important;
+  list-style: none;
+}
+
+.sidebar-content a {
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  border-radius: 0;
+  color: var(--sl-color-gray-3);
+  padding: 0.28rem 1rem;
+  display: block;
+  transition: color 0.1s;
+}
+
+.sidebar-content a:hover {
+  color: var(--sl-color-gray-1);
+  background: transparent;
+}
+
+.sidebar-content a[aria-current='page'] {
+  color: var(--sl-color-white) !important;
+  background: transparent !important;
+  font-weight: 600;
+  /* keep text at same 1rem indent as inactive links: 1rem - 2px border = 0.875rem */
+  padding-left: calc(1rem - 2px);
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  border-left: 2px solid var(--sl-color-gray-3);
+  line-height: 1.4;
+}
+
+.sidebar-content a[aria-current='page']::before {
+  content: none;
+}
+
+/* ── right sidebar: border line only, no fill ────────────── */
+.right-sidebar {
+  border-left: 1px solid var(--sl-color-hairline) !important;
+  background: var(--sl-color-bg) !important;
+}
+
+.right-sidebar-panel {
+  font-family: var(--sl-font-mono);
+  padding: 1.5rem 0 1.5rem 1.25rem;
+}
+
+/* ── TOC heading ──────────────────────────────────────────── */
+#starlight__on-this-page,
+starlight-toc h2 {
+  font-family: var(--sl-font-mono) !important;
+  font-size: 0.6rem !important;
+  font-weight: 400 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+  color: var(--sl-color-gray-5) !important;
+  margin: 0 0 0.75rem 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  /* align flush with toc link text (link has 0.85rem padding-left for border+gap) */
+  padding-left: 0.85rem !important;
+}
+
+#starlight__on-this-page::before,
+starlight-toc h2::before {
+  content: '// ';
+  color: var(--sl-color-gray-5);
+  font-weight: 400;
+}
+
+/* ── TOC links ────────────────────────────────────────────── */
+starlight-toc nav ol {
+  padding-left: 0 !important;
+  margin: 0 !important;
+  list-style: none;
+}
+
+starlight-toc nav ol ol {
+  padding-left: 0.85rem !important;
+}
+
+starlight-toc li {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+starlight-toc a {
+  display: block;
+  color: var(--sl-color-gray-3) !important;
+  font-size: 0.74rem;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  transition: color 0.1s, border-color 0.1s;
+  border-left: 1px solid var(--sl-color-hairline) !important;
+  padding: 0.28rem 0 0.28rem 0.85rem;
+  margin: 0 !important;
+}
+
+starlight-toc a:hover,
+starlight-toc a[aria-current='true'] {
+  color: var(--sl-color-white) !important;
+  border-left-color: var(--sl-color-gray-3) !important;
+}
+
+/* ── search ───────────────────────────────────────────────── */
+input[type='search'] {
+  font-family: var(--sl-font-mono);
+  font-size: 0.75rem;
+  border: 1px solid var(--sl-color-hairline-light) !important;
+  background: var(--sl-color-bg-sidebar) !important;
+  color: var(--sl-color-text) !important;
+}
+
+/* ── hr divider ───────────────────────────────────────────── */
+.sl-markdown-content hr {
+  border: none;
+  border-top: 1px solid var(--sl-color-hairline);
+  margin: 2.5rem 0;
+}
+
+/* ── tables ───────────────────────────────────────────────── */
+.sl-markdown-content table {
+  font-size: 0.78rem;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.sl-markdown-content th {
+  background: var(--sl-color-bg-sidebar);
+  color: var(--sl-color-gray-2);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid var(--sl-color-hairline-light);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.sl-markdown-content td {
+  border: 1px solid var(--sl-color-hairline);
+  padding: 0.45rem 0.75rem;
+  color: var(--sl-color-gray-2);
+}
+
+.sl-markdown-content tr:nth-child(even) td {
+  background: rgba(255,255,255,0.015);
+}
+
+/* ── dot grid background ──────────────────────────────────── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-image: radial-gradient(circle, #1a1a1a 1px, transparent 1px);
+  background-size: 22px 22px;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+:root[data-theme='light'] body::after {
+  background-image: radial-gradient(circle, #d0d0d0 1px, transparent 1px);
+  opacity: 0.3;
+}
+
+/* ── nav links ────────────────────────────────────────────── */
+.social-icons a,
+header nav a:not(.site-title) {
+  font-family: var(--sl-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--sl-color-gray-3) !important;
+  transition: color 0.1s;
+}
+
+.social-icons a:hover,
+header nav a:not(.site-title):hover {
+  color: var(--sl-color-gray-1) !important;
 }

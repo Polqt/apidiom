@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import cast
+from typing import NoReturn, cast
 
 import click
 
@@ -7,7 +7,7 @@ from apidiom.config import GEMINI_PRIVACY_WARNING, readiness_reason
 from apidiom.generate.codegen import CodegenMode
 from apidiom.llm.provider import get_provider
 from apidiom.output.writer import OutputError, write_output
-from apidiom.pipeline import InputKind, Language, generate_client
+from apidiom.pipeline import InputKind, Language, generate_client, generate_mcp_server
 
 _PROVIDERS = ("gemini", "ollama", "null")
 _CODEGEN_MODES = ("auto", "openapi-generator", "builtin")
@@ -63,7 +63,12 @@ def check(ctx: click.Context, provider: str | None) -> None:
     raise click.exceptions.Exit(1)
 
 
-@main.command()
+@main.command(
+    context_settings={
+        "ignore_unknown_options": True,
+        "allow_extra_args": True,
+    }
+)
 @click.argument("source")
 @click.option(
     "--input-kind",
@@ -102,6 +107,12 @@ def generate(
     Example:
       apidiom generate https://example.com/openapi.yaml --output client.py
     """
+    if source == "mcp":
+        _generate_mcp(ctx, output=output, clipboard=clipboard, force=force, quiet=quiet)
+        return
+    if ctx.args:
+        _fail(f"Unexpected arguments: {' '.join(ctx.args)}")
+
     selected_provider = provider or ctx.obj["provider"]
     selected_codegen = codegen or ctx.obj["codegen"]
     selected_input_kind = _input_kind_override(input_kind)
@@ -138,6 +149,34 @@ def generate(
         _print_summary(result)
 
 
+def _generate_mcp(
+    ctx: click.Context,
+    *,
+    output: Path | None,
+    clipboard: bool,
+    force: bool,
+    quiet: bool,
+) -> None:
+    if len(ctx.args) != 1:
+        _fail("Usage: apidiom generate mcp <openapi-spec>")
+    source = ctx.args[0]
+    try:
+        result = generate_mcp_server(source)
+        write_output(
+            result,
+            output=output,
+            clipboard=clipboard,
+            force=force,
+            stdout=click.echo,
+            stderr=lambda message: click.echo(message, err=True),
+        )
+    except (OSError, RuntimeError, ValueError, OutputError) as exc:
+        _fail(str(exc))
+
+    if not quiet:
+        _print_summary(result)
+
+
 def _print_summary(result: object) -> None:
     input_kind = getattr(result, "input_kind", None)
     input_kind_source = getattr(result, "input_kind_source", None)
@@ -158,7 +197,7 @@ def _print_summary(result: object) -> None:
         click.echo(f"- {item}", err=True)
 
 
-def _fail(message: str) -> None:
+def _fail(message: str) -> NoReturn:
     raise click.ClickException(message)
 
 

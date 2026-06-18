@@ -1,0 +1,86 @@
+from __future__ import annotations
+
+import os
+from typing import Any
+
+import httpx
+from mcp.server.fastmcp import FastMCP
+
+DEFAULT_BASE_URL = "{{ default_base_url }}"
+API_BASE_URL = os.environ.get("APIDIOM_API_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
+
+mcp = FastMCP("{{ server_name }}")
+
+
+def _request_json(
+    method: str,
+    path: str,
+    *,
+    params: dict[str, Any] | None = None,
+    json_body: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    url = f"{API_BASE_URL}{path}"
+    with httpx.Client() as client:
+        response = client.request(
+            method,
+            url,
+            params=params,
+            json=json_body,
+            headers=headers,
+        )
+    response.raise_for_status()
+    if not response.content:
+        return {}
+    data = response.json()
+    if isinstance(data, dict):
+        return data
+    return {"data": data}
+
+
+{% for endpoint in endpoints %}
+@mcp.tool()
+def {{ endpoint.function_name }}(
+{% for parameter in endpoint.parameters %}
+    {{ parameter.safe_name }}: {{ parameter.annotation }}{% if not parameter.required %} | None = None{% endif %},
+{% endfor %}
+{% if endpoint.has_body %}
+    body: dict[str, Any] | None = None,
+{% endif %}
+) -> dict[str, Any]:
+    """{{ endpoint.description }}"""
+    path = {{ endpoint.path_expression }}
+    params: dict[str, Any] = {}
+{% for parameter in endpoint.query_parameters %}
+    if {{ parameter.safe_name }} is not None:
+        params["{{ parameter.name }}"] = {{ parameter.safe_name }}
+{% endfor %}
+    headers: dict[str, str] = {}
+{% if endpoint.auth_headers %}
+    api_key = os.environ.get("APIDIOM_API_KEY")
+    if api_key:
+{% for header in endpoint.auth_headers %}
+        headers["{{ header.header_name }}"] = {{ header.value_expression }}
+{% endfor %}
+{% endif %}
+{% if endpoint.has_body %}
+    return _request_json(
+        "{{ endpoint.method }}",
+        path,
+        params=params or None,
+        json_body=body,
+        headers=headers or None,
+    )
+{% else %}
+    return _request_json(
+        "{{ endpoint.method }}",
+        path,
+        params=params or None,
+        headers=headers or None,
+    )
+{% endif %}
+
+
+{% endfor %}
+if __name__ == "__main__":
+    mcp.run()

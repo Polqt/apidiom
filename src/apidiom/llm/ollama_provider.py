@@ -56,6 +56,7 @@ class OllamaProvider(LLMProvider):
         temperature: float = 0.0,
         max_tokens: int = 4096,
         json_mode: bool = False,
+        response_schema: dict[str, Any] | None = None,
     ) -> LLMResponse:
         payload: dict[str, Any] = {
             "model": self._model,

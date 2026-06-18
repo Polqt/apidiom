@@ -12,12 +12,14 @@ export default defineConfig({
     starlight({
       title: 'apidiom',
       customCss: ['./src/styles/custom.css'],
+      components: {
+        SidebarSublist: './src/components/SidebarSublist.astro',
+      },
       disable404Route: true,
       sidebar: [
         {
           label: 'Get Started',
           items: [
-            { label: 'Intro', link: '/' },
             { label: 'Quickstart', slug: 'quickstart' },
           ],
         },

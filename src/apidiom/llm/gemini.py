@@ -54,6 +54,7 @@ class GeminiProvider(LLMProvider):
         temperature: float = 0.0,
         max_tokens: int = 4096,
         json_mode: bool = False,
+        response_schema: dict[str, Any] | None = None,
     ) -> LLMResponse:
         if not self._api_key:
             raise RuntimeError("Gemini is not configured. Set GEMINI_API_KEY.")
@@ -65,6 +66,7 @@ class GeminiProvider(LLMProvider):
             temperature=temperature,
             max_tokens=max_tokens,
             json_mode=json_mode,
+            response_schema=response_schema,
         )
         url = f"{_GEMINI_ENDPOINT}/{self._model}:generateContent"
 
@@ -99,6 +101,7 @@ class GeminiProvider(LLMProvider):
         temperature: float,
         max_tokens: int,
         json_mode: bool,
+        response_schema: dict[str, Any] | None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
@@ -111,6 +114,8 @@ class GeminiProvider(LLMProvider):
             payload["systemInstruction"] = {"parts": [{"text": system}]}
         if json_mode:
             payload["generationConfig"]["responseMimeType"] = "application/json"
+        if response_schema is not None:
+            payload["generationConfig"]["responseSchema"] = response_schema
         return payload
 
 

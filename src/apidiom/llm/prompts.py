@@ -1,3 +1,15 @@
+EXTRACTION_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "openapi": {"type": "string"},
+        "info": {"type": "object"},
+        "servers": {"type": "array"},
+        "paths": {"type": "object"},
+        "components": {"type": "object"},
+    },
+    "required": ["openapi", "info", "paths"],
+}
+
 EXTRACTION_USER_TEMPLATE = """GLOBAL CONTEXT (from earlier chunks; may say "unknown")
 Base URL(s): {servers_or_unknown}
 Authentication: {auth_or_unknown}

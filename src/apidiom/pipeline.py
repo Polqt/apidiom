@@ -9,6 +9,7 @@ import yaml
 
 from apidiom.config import GEMINI_PRIVACY_WARNING
 from apidiom.generate.codegen import CodegenMode, generate_client_code
+from apidiom.generate.mcp import generate_mcp_server as generate_mcp_server_code
 from apidiom.ingest.doc_to_spec import doc_to_spec
 from apidiom.ingest.openapi_ingest import (
     OpenAPIIngestError,
@@ -111,6 +112,20 @@ def generate_client(
         provider_warning=provider_warning,
         input_kind=resolved_input_kind,
         input_kind_source=input_kind_source,
+    )
+
+
+def generate_mcp_server(source: str | Path) -> PipelineResult:
+    spec, model = _load_openapi_source(source)
+    server_text = generate_mcp_server_code(spec, model)
+    return PipelineResult(
+        spec=spec,
+        model=model,
+        generated_client=server_text,
+        generated_files={"server.py": server_text},
+        codegen_tier="mcp",
+        input_kind="openapi",
+        input_kind_source="explicit",
     )
 
 

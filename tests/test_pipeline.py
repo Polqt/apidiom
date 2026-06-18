@@ -2,7 +2,7 @@ import json
 from typing import Any
 
 from apidiom.llm.provider import LLMProvider, LLMResponse
-from apidiom.pipeline import detect_input_kind, generate_client
+from apidiom.pipeline import detect_input_kind, generate_client, generate_mcp_server
 
 
 class FakeProvider(LLMProvider):
@@ -81,6 +81,17 @@ def test_pipeline_structured_spec_returns_code_and_tier() -> None:
     assert result.model.endpoint("GET", "/pets").operation_id == "listPets"
     assert result.input_kind == "openapi"
     assert result.input_kind_source == "detected"
+
+
+def test_pipeline_generates_mcp_server_from_openapi_spec() -> None:
+    result = generate_mcp_server("tests/fixtures/petstore.yaml")
+
+    assert result.generated_client is not None
+    assert result.codegen_tier == "mcp"
+    assert "FastMCP" in result.generated_client
+    assert "def list_pets" in result.generated_client
+    assert result.input_kind == "openapi"
+    assert result.input_kind_source == "explicit"
 
 
 def test_pipeline_unstructured_docs_returns_code_unknowns_and_tier() -> None:
