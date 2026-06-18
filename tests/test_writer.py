@@ -1,8 +1,10 @@
 from pathlib import Path
+from typing import cast
 
 import pytest
 
-from apidiom.output.writer import OutputError, write_output
+from apidiom.models import APIClientModel
+from apidiom.output.writer import ClipboardModule, OutputError, write_output
 from apidiom.pipeline import PipelineResult
 
 
@@ -33,7 +35,7 @@ def _result(
 ) -> PipelineResult:
     return PipelineResult(
         spec={},
-        model=None,
+        model=APIClientModel(title="Test API", version="1.0.0", source="test"),
         generated_client=text,
         generated_files=files or {"client.py": text},
         codegen_tier=tier,
@@ -57,6 +59,30 @@ def test_writer_writes_single_file() -> None:
 
     assert output.read_text(encoding="utf-8") == "hello"
     _clean(output)
+
+
+def test_writer_writes_mcp_readme_next_to_server() -> None:
+    output = Path("tests/fixtures/generated-mcp.py")
+    readme = output.parent / "README.md"
+    _clean(output)
+    _clean(readme)
+
+    write_output(
+        _result(
+            text="server",
+            files={
+                "server.py": "server",
+                "README.md": "python <generated-server-file>",
+            },
+            tier="mcp",
+        ),
+        output=output,
+    )
+
+    assert output.read_text(encoding="utf-8") == "server"
+    assert readme.read_text(encoding="utf-8") == "python generated-mcp.py"
+    _clean(output)
+    _clean(readme)
 
 
 def test_writer_writes_multi_file_directory() -> None:
@@ -94,7 +120,7 @@ def test_writer_clipboard_missing_falls_back_to_stdout() -> None:
     write_output(
         _result(text="client"),
         clipboard=True,
-        clipboard_module=BrokenClipboard(),
+        clipboard_module=cast(ClipboardModule, BrokenClipboard()),
         stdout=stdout.append,
         stderr=stderr.append,
     )
@@ -114,6 +140,10 @@ def test_writer_stdout_default() -> None:
 def test_writer_clipboard_success() -> None:
     clipboard = WorkingClipboard()
 
-    write_output(_result(text="client"), clipboard=True, clipboard_module=clipboard)
+    write_output(
+        _result(text="client"),
+        clipboard=True,
+        clipboard_module=cast(ClipboardModule, clipboard),
+    )
 
     assert clipboard.copied == "client"

@@ -422,7 +422,7 @@ nav.breadcrumbs ol li + li::before {
 
 .site-title::before {
   content: '>';
-  color: var(--sl-color-gray-3);
+  color: var(--sl-color-gray-2);
   font-weight: 400;
   margin-right: 0.4rem;
   line-height: 1;
@@ -449,6 +449,7 @@ nav.breadcrumbs ol li + li::before {
 
 /* ── sidebar content ──────────────────────────────────────── */
 .sidebar-content {
+  font-family: var(--sl-font-mono);
   font-size: 0.72rem;
   padding-top: 0.75rem;
 }
@@ -555,7 +556,7 @@ starlight-toc li {
 
 starlight-toc a {
   display: block;
-  color: var(--sl-color-gray-3) !important;
+  color: var(--sl-color-gray-2) !important;
   font-size: 0.74rem;
   letter-spacing: 0.01em;
   text-decoration: none;

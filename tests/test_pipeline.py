@@ -90,6 +90,9 @@ def test_pipeline_generates_mcp_server_from_openapi_spec() -> None:
     assert result.codegen_tier == "mcp"
     assert "FastMCP" in result.generated_client
     assert "def list_pets" in result.generated_client
+    assert "README.md" in result.generated_files
+    assert "GET:/pets" in result.generated_files["README.md"]
+    assert "APIDIOM_API_BASE_URL" in result.generated_files["README.md"]
     assert result.input_kind == "openapi"
     assert result.input_kind_source == "explicit"
 

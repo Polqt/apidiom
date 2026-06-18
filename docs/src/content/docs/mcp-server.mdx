@@ -67,7 +67,12 @@ enough for agents to inspect quickly:
 ```bash
 apidiom generate mcp \
   https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json \
+  --list
+
+apidiom generate mcp \
+  https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json \
   --include GET:/repos/{owner}/{repo} \
+  --check \
   --output github_repo_mcp.py
 ```
 
@@ -96,3 +101,20 @@ For authenticated APIs, generated tools read credentials from environment
 variables. The generic API key scheme uses `APIDIOM_API_KEY`; named schemes use
 `APIDIOM_<SCHEME_NAME>_API_KEY`. `APIDIOM_API_BASE_URL` overrides the OpenAPI
 server URL.
+
+Stripe works the same way. Filter to the endpoint you need and run the syntax
+check before wiring it into an agent:
+
+```bash
+apidiom generate mcp \
+  https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json \
+  --include POST:/v1/payment_intents \
+  --check \
+  --output stripe_payments_mcp.py
+```
+
+`--check` compiles the generated server, counts exported MCP tools, and prints
+the environment variables the server may read. It does not call the live API.
+When `--output` writes a generated MCP server file, apidiom also writes a
+neighboring `README.md` with the run command, environment variables, and
+exported tool selectors.

@@ -38,11 +38,14 @@ as `openapi`.
 ## Generate an MCP server
 
 ```bash
-apidiom generate mcp ./openapi.yaml --include GET:/pets --output pets_mcp.py
+apidiom generate mcp ./openapi.yaml --list
+apidiom generate mcp ./openapi.yaml --include GET:/pets --check --output pets_mcp.py
 python pets_mcp.py
 ```
 
 Use `--include METHOD:/path/{param}` or `--tag name` for large specs.
+`--check` compiles the generated server and prints the exported tool count
+without calling the API.
 
 ## Generate from messy docs
 

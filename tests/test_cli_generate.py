@@ -1,17 +1,39 @@
+from dataclasses import dataclass
+from typing import Protocol
+
 from click.testing import CliRunner
 
 from apidiom import cli
+from apidiom.models import APIClientModel
 from apidiom.pipeline import PipelineResult
 
 
-def test_generate_calls_pipeline_and_routes_stdout(monkeypatch) -> None:
-    calls: list[dict[str, object]] = []
+@dataclass(frozen=True)
+class _FakeOperation:
+    selector: str
+    function_name: str
+    description: str
+    tags: list[str]
 
-    def fake_generate_client(*args, **kwargs):
-        calls.append({"args": args, "kwargs": kwargs})
+
+class _MonkeyPatch(Protocol):
+    def setattr(self, target: object, name: str, value: object) -> None: ...
+
+
+def _empty_model() -> APIClientModel:
+    return APIClientModel(title="Test API", version="1.0.0", source="test")
+
+
+def test_generate_calls_pipeline_and_routes_stdout(
+    monkeypatch: _MonkeyPatch,
+) -> None:
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def fake_generate_client(*args: object, **kwargs: object) -> PipelineResult:
+        calls.append((args, kwargs))
         return PipelineResult(
             spec={},
-            model=None,
+            model=_empty_model(),
             generated_client="client",
             generated_files={"client.py": "client"},
             codegen_tier="builtin",
@@ -35,17 +57,19 @@ def test_generate_calls_pipeline_and_routes_stdout(monkeypatch) -> None:
     assert "client" in result.stdout
     assert "builtin" in result.stderr
     assert "1 field could not be verified" in result.stderr
-    assert calls[0]["kwargs"]["input_kind"] == "unstructured"
+    assert calls[0][1]["input_kind"] == "unstructured"
 
 
-def test_generate_mcp_calls_pipeline_and_routes_stdout(monkeypatch) -> None:
-    calls: list[dict[str, object]] = []
+def test_generate_mcp_calls_pipeline_and_routes_stdout(
+    monkeypatch: _MonkeyPatch,
+) -> None:
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
 
-    def fake_generate_mcp_server(*args, **kwargs):
-        calls.append({"args": args, "kwargs": kwargs})
+    def fake_generate_mcp_server(*args: object, **kwargs: object) -> PipelineResult:
+        calls.append((args, kwargs))
         return PipelineResult(
             spec={},
-            model=None,
+            model=_empty_model(),
             generated_client="mcp server",
             generated_files={"server.py": "mcp server"},
             codegen_tier="mcp",
@@ -70,8 +94,87 @@ def test_generate_mcp_calls_pipeline_and_routes_stdout(monkeypatch) -> None:
     assert result.exit_code == 0
     assert "mcp server" in result.stdout
     assert "mcp" in result.stderr
-    assert calls[0]["args"] == ("tests/fixtures/petstore.yaml",)
-    assert calls[0]["kwargs"] == {
+    assert calls[0][0] == ("tests/fixtures/petstore.yaml",)
+    assert calls[0][1] == {
         "include_tags": ["pets"],
         "include_operations": ["GET:/pets"],
+    }
+
+
+def test_generate_mcp_check_reports_generated_server_summary(
+    monkeypatch: _MonkeyPatch,
+) -> None:
+    server = """
+from __future__ import annotations
+import os
+from mcp.server.fastmcp import FastMCP
+mcp = FastMCP("demo")
+API_BASE_URL = os.environ.get("APIDIOM_API_BASE_URL", "")
+
+@mcp.tool()
+def get_pet() -> dict:
+    return {}
+"""
+
+    def fake_generate_mcp_server(*args: object, **kwargs: object) -> PipelineResult:
+        return PipelineResult(
+            spec={},
+            model=_empty_model(),
+            generated_client=server,
+            generated_files={"server.py": server},
+            codegen_tier="mcp",
+            input_kind="openapi",
+            input_kind_source="explicit",
+        )
+
+    monkeypatch.setattr(cli, "generate_mcp_server", fake_generate_mcp_server)
+    result = CliRunner().invoke(
+        cli.main,
+        ["generate", "mcp", "tests/fixtures/petstore.yaml", "--check", "--quiet"],
+    )
+
+    assert result.exit_code == 0
+    assert "MCP check: 1 tools" in result.stderr
+    assert "APIDIOM_API_BASE_URL" in result.stderr
+
+
+def test_generate_mcp_list_reports_available_selectors(
+    monkeypatch: _MonkeyPatch,
+) -> None:
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def fake_list_mcp_operations(
+        *args: object,
+        **kwargs: object,
+    ) -> list[_FakeOperation]:
+        calls.append((args, kwargs))
+        return [
+            _FakeOperation(
+                selector="GET:/pets",
+                function_name="list_pets",
+                description="List pets",
+                tags=["pets"],
+            )
+        ]
+
+    monkeypatch.setattr(cli, "list_mcp_operations", fake_list_mcp_operations)
+    result = CliRunner().invoke(
+        cli.main,
+        [
+            "generate",
+            "mcp",
+            "tests/fixtures/petstore.yaml",
+            "--tag",
+            "pets",
+            "--list",
+            "--quiet",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "GET:/pets list_pets - List pets [tags: pets]" in result.stdout
+    assert calls[0][0] == ("tests/fixtures/petstore.yaml",)
+    assert calls[0][1] == {
+        "include_tags": ["pets"],
+        "include_operations": [],
     }

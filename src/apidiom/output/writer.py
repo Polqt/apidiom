@@ -55,6 +55,19 @@ def _write_path(result: PipelineResult, *, output: Path, force: bool) -> None:
     if result.codegen_tier == "openapi-generator" and len(files) > 1:
         _write_directory(files, output=output, force=force)
         return
+    if result.codegen_tier == "mcp" and "README.md" in files:
+        readme_output = output.parent / "README.md"
+        if readme_output.exists() and not force:
+            raise OutputError(
+                f"Refusing to overwrite existing file: {readme_output}. Use --force."
+            )
+        _write_file(result.generated_client or "", output=output, force=force)
+        readme_text = files["README.md"].replace(
+            "<generated-server-file>",
+            output.name,
+        )
+        _write_file(readme_text, output=readme_output, force=force)
+        return
     _write_file(result.generated_client or "", output=output, force=force)
 
 

@@ -10,7 +10,7 @@ import '@fontsource/jetbrains-mono/700.css';
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Generate type-safe Python API clients from messy docs that have no OpenAPI spec." />
-  <title>apidiom — messy docs, idiomatic client</title>
+  <title>apidiom - messy docs, idiomatic client</title>
 </head>
 <body>
 
@@ -38,7 +38,7 @@ import '@fontsource/jetbrains-mono/700.css';
     <button class="cta-p" onclick="navigator.clipboard?.writeText('pip install apidiom')">
       [ &thinsp;pip install apidiom&thinsp; ]
     </button>
-    <a href="/quickstart/" class="cta-g">read the docs →</a>
+    <a href="/quickstart/" class="cta-g">read the docs -&gt;</a>
   </div>
 
   <div class="term-wrap">
@@ -47,7 +47,7 @@ import '@fontsource/jetbrains-mono/700.css';
       <div class="term-scan"></div>
       <div class="term-bar">
         <span class="d r"></span><span class="d y"></span><span class="d g"></span>
-        <span class="term-title">apidiom — docs → client</span>
+        <span class="term-title">apidiom - docs to client</span>
       </div>
 
       <div class="term-body">
@@ -59,7 +59,7 @@ import '@fontsource/jetbrains-mono/700.css';
             <span>9</span><span>10</span><span>11</span><span>12</span>
           </div>
           <div class="pane-code">
-            <span class="plabel">// stripe.com/docs/api — raw html</span>
+            <span class="plabel">// stripe.com/docs/api - raw html</span>
             <div class="noise">
               <span class="t">&lt;section</span> <span class="a">id=</span><span class="v">"charges"</span><span class="t">&gt;</span><br />
               &nbsp;<span class="t">&lt;h2&gt;</span><span class="tx">Charges</span><span class="t">&lt;/h2&gt;</span><br />
@@ -79,9 +79,9 @@ import '@fontsource/jetbrains-mono/700.css';
 
         <!-- ARROW -->
         <div class="arrow-mid" aria-hidden="true">
-          <span>·</span>
-          <span class="a-main">→</span>
-          <span>·</span>
+          <span>-</span>
+          <span class="a-main">-&gt;</span>
+          <span>-</span>
         </div>
 
         <!-- OUTPUT PANE -->
@@ -93,7 +93,7 @@ import '@fontsource/jetbrains-mono/700.css';
             <span class="active">9</span><span>10</span><span>11</span><span>12</span>
           </div>
           <div class="pane-code">
-            <span class="plabel">// charges.py — generated</span>
+            <span class="plabel">// charges.py - generated</span>
             <div class="code">
               <span class="im">import</span> httpx<br />
               <span class="im">from</span> typing <span class="im">import</span> Any<br />
@@ -113,11 +113,11 @@ import '@fontsource/jetbrains-mono/700.css';
       </div>
 
       <div class="term-footer">
-        <span class="tf-item"><span class="ok">✓</span> 12 endpoints extracted</span>
-        <span class="tf-sep">·</span>
-        <span class="tf-item"><span class="warn">⚠</span> 3 unverified fields</span>
-        <span class="tf-sep">·</span>
-        <span class="tf-item"><span class="ok">✓</span> spec validated</span>
+        <span class="tf-item"><span class="ok">ok</span> 12 endpoints extracted</span>
+        <span class="tf-sep">/</span>
+        <span class="tf-item"><span class="warn">warn</span> 3 unverified fields</span>
+        <span class="tf-sep">/</span>
+        <span class="tf-item"><span class="ok">ok</span> spec validated</span>
       </div>
     </div>
   </div>
@@ -133,7 +133,7 @@ import '@fontsource/jetbrains-mono/700.css';
         <div class="step-title">point at any docs</div>
         <div class="step-desc">
           URL, file, or raw text. HTML, Markdown, Postman, or an existing
-          OpenAPI file — apidiom detects which automatically.
+          OpenAPI file - apidiom detects which automatically.
         </div>
       </div>
     </div>
@@ -143,7 +143,7 @@ import '@fontsource/jetbrains-mono/700.css';
         <div class="step-title">spec extracted &amp; validated</div>
         <div class="step-desc">
           LLM pulls structure from prose. Validator signs off. Ambiguous
-          fields get <code>UNVERIFIED:</code> markers — never a silent guess,
+          fields get <code>UNVERIFIED:</code> markers - never a silent guess,
           always a flag.
         </div>
       </div>
@@ -160,23 +160,11 @@ import '@fontsource/jetbrains-mono/700.css';
     </div>
   </div>
 
-  <div class="rule">// install</div>
-
-  <div class="install">
-    <div class="install-box">
-      <span class="pr">$</span>
-      <span>pip install apidiom</span>
-    </div>
-  </div>
 </div>
 
 <footer>
   <span>apidiom</span>
-  <div class="fl">
-    <a href="/quickstart/">docs</a>
-    <a href="https://github.com/Polqt/apidiom">github</a>
-    <a href="https://github.com/Polqt/apidiom/blob/main/LICENSE">MIT</a>
-  </div>
+  <span>MIT</span>
 </footer>
 
 </body>
@@ -193,8 +181,8 @@ import '@fontsource/jetbrains-mono/700.css';
     --border:  #1a1a1a;
     --border-2:#252525;
     --border-3:#333333;
-    --muted:   #444444;
-    --subtle:  #888888;
+    --muted:   #777777;
+    --subtle:  #b0b0b0;
     --text:    #d8d8d8;
     --accent:  #aaaaaa;
     --accent-2:#cccccc;
@@ -249,12 +237,12 @@ import '@fontsource/jetbrains-mono/700.css';
   .logo { color: var(--hi); font-weight: 700; font-size: 0.8rem; letter-spacing: 0.03em; }
   .nav-r { display: flex; align-items: center; gap: 0.05rem; }
   .nav-r a {
-    color: var(--muted); font-size: 0.68rem; text-decoration: none;
+    color: var(--subtle); font-size: 0.68rem; text-decoration: none;
     padding: 0.22rem 0.65rem; letter-spacing: 0.05em;
     border: 1px solid transparent;
     transition: color 0.1s, border-color 0.1s;
   }
-  .nav-r a:hover { color: var(--subtle); }
+  .nav-r a:hover { color: var(--hi); }
 
   /* HERO */
   .hero {
@@ -283,7 +271,7 @@ import '@fontsource/jetbrains-mono/700.css';
   }
 
   .sub {
-    color: var(--subtle); font-size: 0.78rem;
+    color: var(--text); font-size: 0.78rem;
     max-width: 38ch; line-height: 1.85;
     margin-bottom: 2.5rem; margin-left: auto; margin-right: auto;
   }
@@ -303,12 +291,12 @@ import '@fontsource/jetbrains-mono/700.css';
   }
   .cta-p:hover { border-color: var(--subtle); background: rgba(255,255,255,0.03); }
   .cta-g {
-    color: var(--muted); background: none; border: 1px solid transparent;
+    color: var(--subtle); background: none; border: 1px solid transparent;
     padding: 0.52rem 0.9rem; font-family: var(--mono); font-size: 0.7rem;
     letter-spacing: 0.05em; text-decoration: none;
     transition: color 0.12s, border-color 0.12s;
   }
-  .cta-g:hover { color: var(--subtle); border-color: var(--border-3); }
+  .cta-g:hover { color: var(--hi); border-color: var(--border-3); }
 
   /* TERMINAL */
   .term-wrap {
@@ -362,7 +350,7 @@ import '@fontsource/jetbrains-mono/700.css';
   .d.r { background: #ff5f57; }
   .d.y { background: #ffbd2e; }
   .d.g { background: #28c840; }
-  .term-title { flex: 1; text-align: center; color: var(--muted); font-size: 0.6rem; letter-spacing: 0.1em; }
+  .term-title { flex: 1; text-align: center; color: var(--subtle); font-size: 0.6rem; letter-spacing: 0.1em; }
 
   .term-body {
     display: grid;
@@ -388,17 +376,17 @@ import '@fontsource/jetbrains-mono/700.css';
   .pane-code { padding: 1rem 0.9rem; flex: 1; font-size: 0.74rem; line-height: 1.75; }
   .plabel {
     font-size: 0.56rem; letter-spacing: 0.14em;
-    color: var(--muted); margin-bottom: 0.55rem;
+    color: var(--subtle); margin-bottom: 0.55rem;
     border-bottom: 1px solid var(--border);
     padding-bottom: 0.4rem; display: block;
   }
 
-  .noise { color: var(--muted); }
-  .noise .t  { color: #2a2a2a; }
-  .noise .a  { color: #222222; }
-  .noise .v  { color: var(--border-3); }
-  .noise .tx { color: var(--muted); }
-  .noise .c  { color: #1a1a1a; }
+  .noise { color: var(--subtle); }
+  .noise .t  { color: #6f6f6f; }
+  .noise .a  { color: #909090; }
+  .noise .v  { color: var(--accent-2); }
+  .noise .tx { color: var(--text); }
+  .noise .c  { color: #777777; }
 
   .arrow-mid {
     display: flex; align-items: center; justify-content: center;
@@ -406,15 +394,15 @@ import '@fontsource/jetbrains-mono/700.css';
     border-right: 1px solid var(--border);
     flex-direction: column; gap: 2px;
   }
-  .arrow-mid span { color: var(--border-3); font-size: 0.6rem; line-height: 1; }
-  .arrow-mid .a-main { color: var(--accent); font-size: 0.8rem; }
+  .arrow-mid span { color: var(--muted); font-size: 0.6rem; line-height: 1; }
+  .arrow-mid .a-main { color: var(--hi); font-size: 0.8rem; }
 
   .code .kw  { color: var(--subtle); }
   .code .cl  { color: var(--hi); font-weight: 600; }
   .code .fn  { color: var(--accent-2); }
   .code .ty  { color: var(--subtle); }
   .code .cm  { color: var(--accent); font-style: italic; }
-  .code .im  { color: var(--muted); }
+  .code .im  { color: var(--subtle); }
   .code .num { color: var(--subtle); }
 
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
@@ -431,7 +419,7 @@ import '@fontsource/jetbrains-mono/700.css';
     display: flex; gap: 1.5rem; align-items: center;
     background: rgba(9,8,7,0.5);
   }
-  .tf-item { font-size: 0.6rem; color: var(--muted); display: flex; gap: 0.4rem; align-items: center; }
+  .tf-item { font-size: 0.6rem; color: var(--subtle); display: flex; gap: 0.4rem; align-items: center; }
   .tf-item .ok   { color: #4a9; }
   .tf-item .warn { color: var(--accent); }
   .tf-sep { color: var(--border-2); }
@@ -445,7 +433,7 @@ import '@fontsource/jetbrains-mono/700.css';
   .rule {
     width: 100%; max-width: 680px;
     display: flex; align-items: center; gap: 1rem;
-    color: var(--muted); font-size: 0.58rem;
+    color: var(--subtle); font-size: 0.58rem;
     letter-spacing: 0.14em; margin: 5rem 0 3rem;
   }
   .rule::before, .rule::after {
@@ -472,28 +460,8 @@ import '@fontsource/jetbrains-mono/700.css';
   }
   .step-body { padding: 0.9rem 1rem; }
   .step-title { color: var(--hi); font-size: 0.76rem; font-weight: 600; margin-bottom: 0.3rem; }
-  .step-desc { color: var(--subtle); font-size: 0.68rem; line-height: 1.7; }
+  .step-desc { color: var(--text); font-size: 0.68rem; line-height: 1.7; }
   .step-desc code { color: var(--accent); font-size: 0.65rem; font-family: var(--mono); }
-
-  /* INSTALL */
-  .install {
-    display: flex; flex-direction: column;
-    align-items: center; gap: 0.9rem;
-    margin-top: 1.5rem;
-  }
-  .install-box {
-    border: 1px solid var(--border-3); background: var(--bg-2);
-    padding: 0.75rem 1.5rem;
-    display: inline-flex; align-items: center; gap: 0.9rem;
-    font-size: 0.82rem; position: relative;
-  }
-  .install-box::before {
-    content: '';
-    position: absolute; top: -1px; left: 20%; right: 20%; height: 1px;
-    background: linear-gradient(90deg, transparent, var(--subtle), transparent);
-    opacity: 0.4;
-  }
-  .pr { color: var(--accent); }
 
   /* FOOTER */
   footer {
@@ -501,11 +469,8 @@ import '@fontsource/jetbrains-mono/700.css';
     border-top: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
     padding: 1rem 2rem;
-    color: var(--muted); font-size: 0.6rem; letter-spacing: 0.07em;
+    color: var(--subtle); font-size: 0.6rem; letter-spacing: 0.07em;
   }
-  footer a { color: var(--muted); text-decoration: none; transition: color 0.1s; }
-  footer a:hover { color: var(--subtle); }
-  .fl { display: flex; gap: 1.5rem; }
 
   /* LIGHT MODE */
   @media (prefers-color-scheme: light) {

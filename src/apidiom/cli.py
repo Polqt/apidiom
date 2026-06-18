@@ -5,9 +5,16 @@ import click
 
 from apidiom.config import GEMINI_PRIVACY_WARNING, readiness_reason
 from apidiom.generate.codegen import CodegenMode
+from apidiom.generate.mcp import MCPOperationSummary, validate_mcp_server_text
 from apidiom.llm.provider import get_provider
 from apidiom.output.writer import OutputError, write_output
-from apidiom.pipeline import InputKind, Language, generate_client, generate_mcp_server
+from apidiom.pipeline import (
+    InputKind,
+    Language,
+    generate_client,
+    generate_mcp_server,
+    list_mcp_operations,
+)
 
 _PROVIDERS = ("gemini", "ollama", "null")
 _CODEGEN_MODES = ("auto", "openapi-generator", "builtin")
@@ -157,13 +164,26 @@ def _generate_mcp(
     force: bool,
     quiet: bool,
 ) -> None:
-    source, include_tags, include_operations = _parse_mcp_args(ctx.args)
+    source, include_tags, include_operations, check, list_only = _parse_mcp_args(
+        ctx.args
+    )
     try:
+        if list_only:
+            _print_mcp_operations(
+                list_mcp_operations(
+                    source,
+                    include_tags=include_tags,
+                    include_operations=include_operations,
+                )
+            )
+            return
         result = generate_mcp_server(
             source,
             include_tags=include_tags,
             include_operations=include_operations,
         )
+        if check:
+            _print_mcp_check(result.generated_client or "")
         write_output(
             result,
             output=output,
@@ -179,15 +199,25 @@ def _generate_mcp(
         _print_summary(result)
 
 
-def _parse_mcp_args(args: list[str]) -> tuple[str, list[str], list[str]]:
+def _parse_mcp_args(args: list[str]) -> tuple[str, list[str], list[str], bool, bool]:
     if not args:
         _fail("Usage: apidiom generate mcp <openapi-spec>")
     source = args[0]
     include_tags: list[str] = []
     include_operations: list[str] = []
+    check = False
+    list_only = False
     index = 1
     while index < len(args):
         arg = args[index]
+        if arg == "--check":
+            check = True
+            index += 1
+            continue
+        if arg == "--list":
+            list_only = True
+            index += 1
+            continue
         if arg in {"--tag", "--include"}:
             if index + 1 >= len(args):
                 _fail(f"{arg} requires a value")
@@ -208,7 +238,24 @@ def _parse_mcp_args(args: list[str]) -> tuple[str, list[str], list[str]]:
             include_tags.append(value)
         else:
             include_operations.append(value)
-    return source, include_tags, include_operations
+    return source, include_tags, include_operations, check, list_only
+
+
+def _print_mcp_operations(operations: list[MCPOperationSummary]) -> None:
+    for operation in operations:
+        tags = ", ".join(operation.tags)
+        suffix = f" [tags: {tags}]" if tags else ""
+        click.echo(
+            f"{operation.selector} {operation.function_name} - "
+            f"{operation.description}{suffix}"
+        )
+
+
+def _print_mcp_check(server_text: str) -> None:
+    check = validate_mcp_server_text(server_text)
+    click.echo(f"MCP check: {check.tool_count} tools", err=True)
+    if check.env_vars:
+        click.echo(f"Env vars: {', '.join(check.env_vars)}", err=True)
 
 
 def _print_summary(result: object) -> None:

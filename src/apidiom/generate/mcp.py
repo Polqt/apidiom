@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import keyword
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -9,7 +10,13 @@ from typing import Any, cast
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from apidiom.generate.codegen import _camel_to_snake, _function_name, _safe_identifier
-from apidiom.models import APIClientModel, APIEndpoint, APIParameter, AuthScheme
+from apidiom.models import (
+    APIClientModel,
+    APIEndpoint,
+    APIParameter,
+    AuthScheme,
+    OpenAPISchema,
+)
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 
@@ -38,8 +45,23 @@ class _MCPEndpoint:
     body_hint: str | None
     parameters: list[_MCPParameter]
     query_parameters: list[_MCPParameter]
+    body_params: list[_MCPParameter]
     has_body: bool
     auth_headers: list[_MCPAuthHeader]
+
+
+@dataclass(frozen=True)
+class MCPServerCheck:
+    tool_count: int
+    env_vars: list[str]
+
+
+@dataclass(frozen=True)
+class MCPOperationSummary:
+    selector: str
+    function_name: str
+    description: str
+    tags: list[str]
 
 
 def generate_mcp_server(
@@ -76,6 +98,40 @@ def generate_mcp_server(
     return f"{server_text.rstrip()}\n"
 
 
+def list_mcp_operations(
+    spec: dict[str, Any],
+    model: APIClientModel,
+    *,
+    include_tags: list[str] | None = None,
+    include_operations: list[str] | None = None,
+) -> list[MCPOperationSummary]:
+    """List MCP operation selectors available for generation."""
+    return [
+        MCPOperationSummary(
+            selector=f"{endpoint.method}:{endpoint.path}",
+            function_name=_function_name(endpoint),
+            description=_description(endpoint),
+            tags=_operation_tags(endpoint, spec),
+        )
+        for endpoint in model.endpoints
+        if _include_endpoint(
+            endpoint,
+            spec,
+            include_tags=include_tags or [],
+            include_operations=include_operations or [],
+        )
+    ]
+
+
+def validate_mcp_server_text(server_text: str) -> MCPServerCheck:
+    compile(server_text, "generated_mcp_server.py", "exec")
+    env_vars = sorted(set(re.findall(r'os\.environ\.get\("([^"]+)"', server_text)))
+    return MCPServerCheck(
+        tool_count=server_text.count("@mcp.tool()"),
+        env_vars=env_vars,
+    )
+
+
 def _template_endpoint(endpoint: APIEndpoint, model: APIClientModel) -> _MCPEndpoint:
     path_parameters = [
         _template_parameter(parameter) for parameter in endpoint.path_parameters
@@ -88,15 +144,18 @@ def _template_endpoint(endpoint: APIEndpoint, model: APIClientModel) -> _MCPEndp
         + [parameter for parameter in query_parameters if parameter.required]
         + [parameter for parameter in query_parameters if not parameter.required]
     )
+    body_params = _extract_body_params(endpoint.request_schema)
+    has_body = endpoint.request_schema is not None and not body_params
     return _MCPEndpoint(
         function_name=_function_name(endpoint),
         method=endpoint.method,
         path_expression=_path_expression(endpoint.path, path_parameters),
         description=_description(endpoint),
-        body_hint=_body_hint(endpoint),
+        body_hint=_body_hint(endpoint) if has_body else None,
         parameters=all_parameters,
         query_parameters=query_parameters,
-        has_body=endpoint.request_schema is not None,
+        body_params=body_params,
+        has_body=has_body,
         auth_headers=_auth_headers(endpoint, model.auth_schemes),
     )
 
@@ -124,6 +183,32 @@ def _python_type(schema: dict[str, Any]) -> str:
     if schema_type == "object":
         return "dict[str, Any]"
     return "str"
+
+
+def _extract_body_params(schema: OpenAPISchema | None) -> list[_MCPParameter]:
+    if schema is None:
+        return []
+    s = schema.value
+    if s.get("type") != "object":
+        return []
+    props = s.get("properties")
+    if not isinstance(props, dict) or not props:
+        return []
+    required = set(s.get("required") or [])
+    result: list[_MCPParameter] = []
+    for name, prop_schema in props.items():
+        py_type = _python_type(prop_schema if isinstance(prop_schema, dict) else {})
+        if py_type in {"list[Any]", "dict[str, Any]"}:
+            return []
+        result.append(
+            _MCPParameter(
+                name=name,
+                safe_name=_safe_parameter_name(name),
+                annotation=py_type,
+                required=name in required,
+            )
+        )
+    return result
 
 
 def _safe_parameter_name(name: str) -> str:

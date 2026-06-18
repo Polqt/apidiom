@@ -8,8 +8,8 @@ from urllib.request import urlopen
 import yaml
 
 from apidiom.config import GEMINI_PRIVACY_WARNING
+from apidiom.generate import mcp as mcp_codegen
 from apidiom.generate.codegen import CodegenMode, generate_client_code
-from apidiom.generate.mcp import generate_mcp_server as generate_mcp_server_code
 from apidiom.ingest.doc_to_spec import doc_to_spec
 from apidiom.ingest.openapi_ingest import (
     OpenAPIIngestError,
@@ -122,20 +122,46 @@ def generate_mcp_server(
     include_operations: list[str] | None = None,
 ) -> PipelineResult:
     spec, model = _load_openapi_source(source, validate_document=False)
-    server_text = generate_mcp_server_code(
+    server_text = mcp_codegen.generate_mcp_server(
         spec,
         model,
         include_tags=include_tags,
         include_operations=include_operations,
     )
+    readme_text = _mcp_readme(
+        source=source,
+        server_name="<generated-server-file>",
+        server_text=server_text,
+        operations=mcp_codegen.list_mcp_operations(
+            spec,
+            model,
+            include_tags=include_tags,
+            include_operations=include_operations,
+        ),
+    )
     return PipelineResult(
         spec=spec,
         model=model,
         generated_client=server_text,
-        generated_files={"server.py": server_text},
+        generated_files={"server.py": server_text, "README.md": readme_text},
         codegen_tier="mcp",
         input_kind="openapi",
         input_kind_source="explicit",
+    )
+
+
+def list_mcp_operations(
+    source: str | Path,
+    *,
+    include_tags: list[str] | None = None,
+    include_operations: list[str] | None = None,
+) -> list[mcp_codegen.MCPOperationSummary]:
+    spec, model = _load_openapi_source(source, validate_document=False)
+    return mcp_codegen.list_mcp_operations(
+        spec,
+        model,
+        include_tags=include_tags,
+        include_operations=include_operations,
     )
 
 
@@ -143,6 +169,39 @@ def _provider_warning(provider: LLMProvider | None) -> str | None:
     if provider is not None and provider.name == "gemini":
         return GEMINI_PRIVACY_WARNING
     return None
+
+
+def _mcp_readme(
+    *,
+    source: str | Path,
+    server_name: str,
+    server_text: str,
+    operations: list[mcp_codegen.MCPOperationSummary],
+) -> str:
+    check = mcp_codegen.validate_mcp_server_text(server_text)
+    env_vars = "\n".join(f"- `{env_var}`" for env_var in check.env_vars)
+    selectors = "\n".join(
+        f"- `{operation.selector}` -> `{operation.function_name}`"
+        for operation in operations
+    )
+    return f"""# Generated MCP server
+
+Source: `{source}`
+
+Run:
+
+```bash
+python {server_name}
+```
+
+Environment variables:
+
+{env_vars or "- None"}
+
+Exported tools:
+
+{selectors or "- None"}
+"""
 
 
 def _load_openapi_source(
