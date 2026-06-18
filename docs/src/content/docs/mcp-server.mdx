@@ -51,3 +51,48 @@ Provider behavior matches the CLI privacy model. The default provider is
 `null`. If an agent selects `gemini`, the response includes the warning that
 Gemini free-tier data may be used for training and should only be used for
 public docs.
+
+## Generate an MCP server from OpenAPI
+
+`apidiom` can also turn an OpenAPI spec into a runnable MCP server:
+
+```bash
+apidiom generate mcp ./openapi.yaml --output api_mcp.py
+python api_mcp.py
+```
+
+For large public specs, filter the output first. This keeps the MCP server small
+enough for agents to inspect quickly:
+
+```bash
+apidiom generate mcp \
+  https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json \
+  --include GET:/repos/{owner}/{repo} \
+  --output github_repo_mcp.py
+```
+
+Generated excerpt:
+
+```python
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("github_v3_rest_api")
+
+@mcp.tool()
+def repos_get(owner: str, repo: str) -> dict[str, Any]:
+    """Get a repository"""
+    path = f"/repos/{owner}/{repo}"
+    params: dict[str, Any] = {}
+    headers: dict[str, str] = {}
+    return _request_json(
+        "GET",
+        path,
+        params=params or None,
+        headers=headers or None,
+    )
+```
+
+For authenticated APIs, generated tools read credentials from environment
+variables. The generic API key scheme uses `APIDIOM_API_KEY`; named schemes use
+`APIDIOM_<SCHEME_NAME>_API_KEY`. `APIDIOM_API_BASE_URL` overrides the OpenAPI
+server URL.

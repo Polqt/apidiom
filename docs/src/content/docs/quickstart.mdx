@@ -35,6 +35,15 @@ apidiom generate ./openapi.yaml --output client.py --codegen builtin
 The default input kind is `auto`. A clean JSON or YAML OpenAPI spec is detected
 as `openapi`.
 
+## Generate an MCP server
+
+```bash
+apidiom generate mcp ./openapi.yaml --include GET:/pets --output pets_mcp.py
+python pets_mcp.py
+```
+
+Use `--include METHOD:/path/{param}` or `--tag name` for large specs.
+
 ## Generate from messy docs
 
 ```bash

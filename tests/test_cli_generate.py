@@ -60,6 +60,10 @@ def test_generate_mcp_calls_pipeline_and_routes_stdout(monkeypatch) -> None:
             "generate",
             "mcp",
             "tests/fixtures/petstore.yaml",
+            "--tag",
+            "pets",
+            "--include",
+            "GET:/pets",
         ],
     )
 
@@ -67,3 +71,7 @@ def test_generate_mcp_calls_pipeline_and_routes_stdout(monkeypatch) -> None:
     assert "mcp server" in result.stdout
     assert "mcp" in result.stderr
     assert calls[0]["args"] == ("tests/fixtures/petstore.yaml",)
+    assert calls[0]["kwargs"] == {
+        "include_tags": ["pets"],
+        "include_operations": ["GET:/pets"],
+    }

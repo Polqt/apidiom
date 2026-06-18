@@ -157,11 +157,13 @@ def _generate_mcp(
     force: bool,
     quiet: bool,
 ) -> None:
-    if len(ctx.args) != 1:
-        _fail("Usage: apidiom generate mcp <openapi-spec>")
-    source = ctx.args[0]
+    source, include_tags, include_operations = _parse_mcp_args(ctx.args)
     try:
-        result = generate_mcp_server(source)
+        result = generate_mcp_server(
+            source,
+            include_tags=include_tags,
+            include_operations=include_operations,
+        )
         write_output(
             result,
             output=output,
@@ -175,6 +177,38 @@ def _generate_mcp(
 
     if not quiet:
         _print_summary(result)
+
+
+def _parse_mcp_args(args: list[str]) -> tuple[str, list[str], list[str]]:
+    if not args:
+        _fail("Usage: apidiom generate mcp <openapi-spec>")
+    source = args[0]
+    include_tags: list[str] = []
+    include_operations: list[str] = []
+    index = 1
+    while index < len(args):
+        arg = args[index]
+        if arg in {"--tag", "--include"}:
+            if index + 1 >= len(args):
+                _fail(f"{arg} requires a value")
+            value = args[index + 1]
+            index += 2
+        elif arg.startswith("--tag="):
+            value = arg.removeprefix("--tag=")
+            arg = "--tag"
+            index += 1
+        elif arg.startswith("--include="):
+            value = arg.removeprefix("--include=")
+            arg = "--include"
+            index += 1
+        else:
+            _fail(f"Unexpected MCP argument: {arg}")
+
+        if arg == "--tag":
+            include_tags.append(value)
+        else:
+            include_operations.append(value)
+    return source, include_tags, include_operations
 
 
 def _print_summary(result: object) -> None:

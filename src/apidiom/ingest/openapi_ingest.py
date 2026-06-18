@@ -33,25 +33,39 @@ class OpenAPIIngestError(ValueError):
     """Raised when an OpenAPI document cannot be loaded or normalized."""
 
 
-def load_openapi(source: str | Path) -> APIClientModel:
+def load_openapi(
+    source: str | Path, *, validate_document: bool = True
+) -> APIClientModel:
     source_label = str(source)
-    document = load_openapi_document(source)
-    return normalize_openapi_document(document, source_label)
+    document = load_openapi_document(source, validate_document=validate_document)
+    return normalize_openapi_document(
+        document,
+        source_label,
+        validate_document=validate_document,
+    )
 
 
-def load_openapi_document(source: str | Path) -> dict[str, Any]:
+def load_openapi_document(
+    source: str | Path,
+    *,
+    validate_document: bool = True,
+) -> dict[str, Any]:
     source_label = str(source)
     raw_document = _read_source(source)
     document = _parse_document(raw_document, source_label)
-    _validate_document(document, source_label)
+    if validate_document:
+        _validate_document(document, source_label)
     return document
 
 
 def normalize_openapi_document(
     document: dict[str, Any],
     source_label: str,
+    *,
+    validate_document: bool = True,
 ) -> APIClientModel:
-    _validate_document(document, source_label)
+    if validate_document:
+        _validate_document(document, source_label)
     return _normalize_document(document, source_label)
 
 
@@ -166,13 +180,16 @@ def _normalize_endpoints(document: dict[str, Any]) -> list[APIEndpoint]:
 
     for path, raw_path_item in paths.items():
         path_item = _as_mapping(raw_path_item)
-        path_parameters = _normalize_parameters(path_item.get("parameters"))
+        path_parameters = _normalize_parameters(path_item.get("parameters"), document)
         for method_name, raw_operation in path_item.items():
             method = method_name.upper()
             if method not in _HTTP_METHODS:
                 continue
             operation = _as_mapping(raw_operation)
-            operation_parameters = _normalize_parameters(operation.get("parameters"))
+            operation_parameters = _normalize_parameters(
+                operation.get("parameters"),
+                document,
+            )
             parameters = _merge_parameters(path_parameters, operation_parameters)
             endpoints.append(
                 APIEndpoint(
@@ -203,13 +220,16 @@ def _normalize_endpoints(document: dict[str, Any]) -> list[APIEndpoint]:
     return endpoints
 
 
-def _normalize_parameters(raw_parameters: object) -> list[APIParameter]:
+def _normalize_parameters(
+    raw_parameters: object,
+    document: dict[str, Any],
+) -> list[APIParameter]:
     if not isinstance(raw_parameters, list):
         return []
 
     parameters: list[APIParameter] = []
     for raw_parameter in raw_parameters:
-        parameter = _as_mapping(raw_parameter)
+        parameter = _resolve_parameter_ref(_as_mapping(raw_parameter), document)
         location = parameter.get("in")
         if location not in {"path", "query"}:
             continue
@@ -225,6 +245,19 @@ def _normalize_parameters(raw_parameters: object) -> list[APIParameter]:
         )
 
     return parameters
+
+
+def _resolve_parameter_ref(
+    parameter: dict[str, Any],
+    document: dict[str, Any],
+) -> dict[str, Any]:
+    ref = parameter.get("$ref")
+    if not isinstance(ref, str) or not ref.startswith("#/components/parameters/"):
+        return parameter
+    name = ref.rsplit("/", 1)[-1]
+    components = _as_mapping(document.get("components"))
+    parameters = _as_mapping(components.get("parameters"))
+    return _as_mapping(parameters.get(name))
 
 
 def _merge_parameters(

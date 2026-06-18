@@ -2,7 +2,11 @@ from pathlib import Path
 
 import pytest
 
-from apidiom.ingest.openapi_ingest import OpenAPIIngestError, load_openapi
+from apidiom.ingest.openapi_ingest import (
+    OpenAPIIngestError,
+    load_openapi,
+    normalize_openapi_document,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -48,6 +52,35 @@ def test_load_openapi_accepts_json_file() -> None:
     api = load_openapi(FIXTURES / "petstore.json")
 
     assert api.endpoint("GET", "/pets").operation_id == "listPets"
+
+
+def test_load_openapi_resolves_local_parameter_refs() -> None:
+    spec = {
+        "openapi": "3.1.0",
+        "info": {"title": "Ref API", "version": "1.0.0"},
+        "components": {
+            "parameters": {
+                "owner": {
+                    "name": "owner",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string"},
+                }
+            }
+        },
+        "paths": {
+            "/repos/{owner}": {
+                "parameters": [{"$ref": "#/components/parameters/owner"}],
+                "get": {"responses": {"200": {"description": "OK"}}},
+            }
+        },
+    }
+
+    api = normalize_openapi_document(spec, "test")
+
+    endpoint = api.endpoint("GET", "/repos/{owner}")
+    assert endpoint.path_parameters[0].name == "owner"
+    assert endpoint.path_parameters[0].schema_model.value["type"] == "string"
 
 
 def test_load_openapi_missing_file_raises_actionable_error() -> None:

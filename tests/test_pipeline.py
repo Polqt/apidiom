@@ -94,6 +94,49 @@ def test_pipeline_generates_mcp_server_from_openapi_spec() -> None:
     assert result.input_kind_source == "explicit"
 
 
+def test_pipeline_passes_mcp_filters() -> None:
+    result = generate_mcp_server(
+        "tests/fixtures/petstore.yaml",
+        include_operations=["GET:/pets/{petId}"],
+    )
+
+    assert result.generated_client is not None
+    assert "def get_pet(" in result.generated_client
+    assert "def list_pets(" not in result.generated_client
+
+
+def test_pipeline_mcp_generation_tolerates_real_world_spec_validation_noise() -> None:
+    spec = {
+        "openapi": "3.1.0",
+        "info": {"title": "Noisy API", "version": "1.0.0"},
+        "paths": {
+            "/deployments": {
+                "get": {
+                    "operationId": "listDeployments",
+                    "parameters": [
+                        {
+                            "name": "callback",
+                            "in": "query",
+                            "required": False,
+                            "schema": {
+                                "type": "string",
+                                "format": "uri",
+                                "default": "",
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    }
+
+    result = generate_mcp_server(json.dumps(spec))
+
+    assert result.generated_client is not None
+    assert "def list_deployments(" in result.generated_client
+
+
 def test_pipeline_unstructured_docs_returns_code_unknowns_and_tier() -> None:
     fragment: dict[str, Any] = {
         "openapi": "3.1.0",

@@ -48,7 +48,12 @@ def {{ endpoint.function_name }}(
     body: dict[str, Any] | None = None,
 {% endif %}
 ) -> dict[str, Any]:
-    """{{ endpoint.description }}"""
+    """{{ endpoint.description }}
+{% if endpoint.body_hint %}
+
+    {{ endpoint.body_hint }}
+{% endif %}
+    """
     path = {{ endpoint.path_expression }}
     params: dict[str, Any] = {}
 {% for parameter in endpoint.query_parameters %}
@@ -57,9 +62,9 @@ def {{ endpoint.function_name }}(
 {% endfor %}
     headers: dict[str, str] = {}
 {% if endpoint.auth_headers %}
-    api_key = os.environ.get("APIDIOM_API_KEY")
-    if api_key:
 {% for header in endpoint.auth_headers %}
+    api_key = os.environ.get("{{ header.env_var }}")
+    if api_key:
         headers["{{ header.header_name }}"] = {{ header.value_expression }}
 {% endfor %}
 {% endif %}

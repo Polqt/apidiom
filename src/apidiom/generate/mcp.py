@@ -8,7 +8,7 @@ from typing import Any, cast
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from apidiom.generate.codegen import _function_name, _safe_identifier
+from apidiom.generate.codegen import _camel_to_snake, _function_name, _safe_identifier
 from apidiom.models import APIClientModel, APIEndpoint, APIParameter, AuthScheme
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -25,6 +25,7 @@ class _MCPParameter:
 @dataclass(frozen=True)
 class _MCPAuthHeader:
     header_name: str
+    env_var: str
     value_expression: str
 
 
@@ -34,14 +35,33 @@ class _MCPEndpoint:
     method: str
     path_expression: str
     description: str
+    body_hint: str | None
     parameters: list[_MCPParameter]
     query_parameters: list[_MCPParameter]
     has_body: bool
     auth_headers: list[_MCPAuthHeader]
 
 
-def generate_mcp_server(spec: dict[str, Any], model: APIClientModel) -> str:
+def generate_mcp_server(
+    spec: dict[str, Any],
+    model: APIClientModel,
+    *,
+    include_tags: list[str] | None = None,
+    include_operations: list[str] | None = None,
+) -> str:
     """Generate a runnable Python MCP server for an OpenAPI model."""
+    endpoints = [
+        endpoint
+        for endpoint in model.endpoints
+        if _include_endpoint(
+            endpoint,
+            spec,
+            include_tags=include_tags or [],
+            include_operations=include_operations or [],
+        )
+    ]
+    if not endpoints:
+        raise ValueError("No OpenAPI endpoints matched MCP filters.")
     template = Environment(
         loader=FileSystemLoader(_TEMPLATE_DIR),
         undefined=StrictUndefined,
@@ -51,7 +71,7 @@ def generate_mcp_server(spec: dict[str, Any], model: APIClientModel) -> str:
     server_text = template.render(
         server_name=_safe_identifier(model.title),
         default_base_url=_default_base_url(spec),
-        endpoints=[_template_endpoint(endpoint, model) for endpoint in model.endpoints],
+        endpoints=[_template_endpoint(endpoint, model) for endpoint in endpoints],
     )
     return f"{server_text.rstrip()}\n"
 
@@ -73,6 +93,7 @@ def _template_endpoint(endpoint: APIEndpoint, model: APIClientModel) -> _MCPEndp
         method=endpoint.method,
         path_expression=_path_expression(endpoint.path, path_parameters),
         description=_description(endpoint),
+        body_hint=_body_hint(endpoint),
         parameters=all_parameters,
         query_parameters=query_parameters,
         has_body=endpoint.request_schema is not None,
@@ -140,16 +161,100 @@ def _auth_headers(
         if scheme.type == "apiKey" and scheme.api_key_in == "header":
             header_name = scheme.api_key_name or scheme.name
             headers.append(
-                _MCPAuthHeader(header_name=header_name, value_expression="api_key")
+                _MCPAuthHeader(
+                    header_name=header_name,
+                    env_var=_auth_env_var(scheme.name),
+                    value_expression="api_key",
+                )
             )
         elif scheme.type == "http" and scheme.scheme == "bearer":
             headers.append(
                 _MCPAuthHeader(
                     header_name="Authorization",
+                    env_var=_auth_env_var(scheme.name),
                     value_expression='f"Bearer {api_key}"',
                 )
             )
     return headers
+
+
+def _auth_env_var(scheme_name: str) -> str:
+    stem = _safe_identifier(_camel_to_snake(scheme_name)).upper()
+    if stem == "API_KEY":
+        return "APIDIOM_API_KEY"
+    return f"APIDIOM_{stem}_API_KEY"
+
+
+def _body_hint(endpoint: APIEndpoint) -> str | None:
+    if endpoint.request_schema is None:
+        return None
+    summary = _schema_summary(endpoint.request_schema.value)
+    return f"Body schema: {summary}."
+
+
+def _schema_summary(schema: dict[str, Any]) -> str:
+    ref = schema.get("$ref")
+    if isinstance(ref, str):
+        return ref.rsplit("/", 1)[-1]
+    properties = schema.get("properties")
+    if isinstance(properties, dict) and properties:
+        names = ", ".join(str(name) for name in properties)
+        return f"object with properties: {names}"
+    schema_type = schema.get("type")
+    if isinstance(schema_type, str):
+        return schema_type
+    return "unconstrained JSON object"
+
+
+def _include_endpoint(
+    endpoint: APIEndpoint,
+    spec: dict[str, Any],
+    *,
+    include_tags: list[str],
+    include_operations: list[str],
+) -> bool:
+    if not include_tags and not include_operations:
+        return True
+    if include_tags and set(include_tags).intersection(_operation_tags(endpoint, spec)):
+        return True
+    for selector in include_operations:
+        if _operation_selector_matches(endpoint, selector):
+            return True
+    return False
+
+
+def _operation_tags(endpoint: APIEndpoint, spec: dict[str, Any]) -> list[str]:
+    operation = _operation_for_endpoint(endpoint, spec)
+    tags = operation.get("tags") if operation is not None else None
+    if not isinstance(tags, list):
+        return []
+    return [tag for tag in tags if isinstance(tag, str)]
+
+
+def _operation_selector_matches(endpoint: APIEndpoint, selector: str) -> bool:
+    if ":" in selector:
+        method, path = selector.split(":", 1)
+        return endpoint.method == method.upper() and endpoint.path == path
+    return selector in {
+        endpoint.operation_id or "",
+        _function_name(endpoint),
+    }
+
+
+def _operation_for_endpoint(
+    endpoint: APIEndpoint,
+    spec: dict[str, Any],
+) -> dict[str, Any] | None:
+    paths = spec.get("paths")
+    if not isinstance(paths, dict):
+        return None
+    path_item = paths.get(endpoint.path)
+    if not isinstance(path_item, dict):
+        return None
+    operation = path_item.get(endpoint.method.lower())
+    if isinstance(operation, dict):
+        return cast(dict[str, Any], operation)
+    return None
 
 
 def _default_base_url(spec: dict[str, Any]) -> str:

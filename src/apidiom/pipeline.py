@@ -115,9 +115,19 @@ def generate_client(
     )
 
 
-def generate_mcp_server(source: str | Path) -> PipelineResult:
-    spec, model = _load_openapi_source(source)
-    server_text = generate_mcp_server_code(spec, model)
+def generate_mcp_server(
+    source: str | Path,
+    *,
+    include_tags: list[str] | None = None,
+    include_operations: list[str] | None = None,
+) -> PipelineResult:
+    spec, model = _load_openapi_source(source, validate_document=False)
+    server_text = generate_mcp_server_code(
+        spec,
+        model,
+        include_tags=include_tags,
+        include_operations=include_operations,
+    )
     return PipelineResult(
         spec=spec,
         model=model,
@@ -135,11 +145,15 @@ def _provider_warning(provider: LLMProvider | None) -> str | None:
     return None
 
 
-def _load_openapi_source(source: str | Path) -> tuple[dict[str, Any], APIClientModel]:
+def _load_openapi_source(
+    source: str | Path,
+    *,
+    validate_document: bool = True,
+) -> tuple[dict[str, Any], APIClientModel]:
     try:
         if _is_existing_file_or_url(source):
-            spec = load_openapi_document(source)
-            model = load_openapi(source)
+            spec = load_openapi_document(source, validate_document=validate_document)
+            model = load_openapi(source, validate_document=validate_document)
             return spec, model
 
         raw_document = str(source)
@@ -149,7 +163,11 @@ def _load_openapi_source(source: str | Path) -> tuple[dict[str, Any], APIClientM
                 "Could not parse OpenAPI document: inline input. "
                 "Provide valid JSON or YAML."
             )
-        return inline_spec, normalize_openapi_document(inline_spec, "inline input")
+        return inline_spec, normalize_openapi_document(
+            inline_spec,
+            "inline input",
+            validate_document=validate_document,
+        )
     except OpenAPIIngestError as exc:
         raise RuntimeError(str(exc)) from exc
 
