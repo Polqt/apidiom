@@ -255,3 +255,23 @@ def test_generate_schema_calls_pipeline_with_format(monkeypatch: _MonkeyPatch) -
     assert isinstance(request, ToolGenerationRequest)
     assert request.target == "schema"
     assert request.schema_format == "openai"
+
+
+def test_generate_langchain_rejects_mcp_only_check_flag() -> None:
+    result = CliRunner().invoke(
+        cli.main,
+        ["generate", "langchain", "tests/fixtures/petstore.yaml", "--check"],
+    )
+
+    assert result.exit_code == 1
+    assert "--check is only supported for MCP generation" in result.stderr
+
+
+def test_generate_mcp_rejects_schema_only_format_flag() -> None:
+    result = CliRunner().invoke(
+        cli.main,
+        ["generate", "mcp", "tests/fixtures/petstore.yaml", "--format", "openai"],
+    )
+
+    assert result.exit_code == 1
+    assert "--format is only supported for schema generation" in result.stderr

@@ -1,5 +1,114 @@
 # apidiom
 
+> Turn any OpenAPI spec into an MCP server in one command.
+
+```bash
+npx apidiom generate mcp stripe > stripe-mcp.js
+node stripe-mcp.js
+```
+
+Point Claude Desktop (or any MCP client) at the generated file — your AI agent can now call Stripe directly.
+
+## Quick Start
+
+```bash
+npm install -g apidiom
+# or without installing:
+npx apidiom generate mcp stripe > stripe-mcp.js
+```
+
+Requires **Node.js 18+**.
+
+## Usage
+
+```bash
+# Generate from a built-in service
+apidiom generate mcp stripe --output stripe-mcp.js
+
+# From a local OpenAPI spec
+apidiom generate mcp ./my-api.yaml --output my-api-mcp.js
+
+# From a URL
+apidiom generate mcp https://example.com/openapi.yaml --output out.js
+
+# Filter to a tag or specific operations
+apidiom generate mcp github --tag repos
+apidiom generate mcp openai --include createChatCompletion
+
+# List built-in services
+apidiom generate mcp --list
+```
+
+## Connect to Claude Desktop
+
+`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "stripe": {
+      "command": "node",
+      "args": ["/path/to/stripe-mcp.js"],
+      "env": { "STRIPE_BEARER_TOKEN": "sk_test_..." }
+    }
+  }
+}
+```
+
+## Built-in Services
+
+| Name | Description |
+|------|-------------|
+| `stripe` | Stripe Payments API |
+| `github` | GitHub REST API |
+| `openai` | OpenAI API |
+| `sendgrid` | SendGrid Email API |
+| `pagerduty` | PagerDuty Incident Management API |
+| `cloudflare` | Cloudflare API |
+| `twilio` | Twilio Programmable API |
+| `discord` | Discord HTTP API |
+| `spotify` | Spotify Web API |
+| `zoom` | Zoom Video Conferencing API |
+| `notion` | Notion API |
+| `jira` | Jira Cloud REST API |
+| `vercel` | Vercel Deployment API |
+| `petstore` | Petstore (demo) |
+
+## Generated Server
+
+Output is a **single self-contained JS file** — zero npm dependencies, Node.js built-ins only.
+
+- MCP protocol over stdio (`initialize`, `tools/list`, `tools/call`)
+- One MCP tool per API endpoint with full parameter schemas
+- Auth read from env vars — fails fast with a clear error if missing
+- `$ref` pointers in OpenAPI specs resolved automatically
+
+Auth env var names are derived from the security scheme name:
+`STRIPE_BEARER_TOKEN`, `GITHUB_BEARER_TOKEN`, `OPENAI_BEARER_TOKEN`, etc.
+
+## Known Limitations
+
+- External `$ref` files not supported (only `#/components/...` inline refs)
+- OAuth2 / OpenID Connect not supported in generated code
+
+## Add a Service
+
+Edit `ts/registry.json` and open a PR:
+
+```json
+"my-service": { "url": "https://...", "description": "My Service API" }
+```
+
+## License
+
+MIT
+
+---
+
+*Legacy Python docs below — kept for reference during transition.*
+
+---
+
 `apidiom` turns API documentation into idiomatic Python API clients.
 
 The wedge: it can generate clients from messy docs that do not have a clean

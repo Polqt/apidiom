@@ -332,10 +332,14 @@ def _parse_tool_args(args: list[str], *, command: str) -> _ToolArgs:
     while index < len(args):
         arg = args[index]
         if arg == "--check":
+            if command != "mcp":
+                _fail("--check is only supported for MCP generation")
             check = True
             index += 1
             continue
         if arg == "--list":
+            if command != "mcp":
+                _fail("--list is only supported for MCP generation")
             list_only = True
             index += 1
             continue
@@ -372,6 +376,8 @@ def _parse_tool_args(args: list[str], *, command: str) -> _ToolArgs:
         elif arg == "--include":
             include_operations.append(value)
         else:
+            if command != "schema":
+                _fail("--format is only supported for schema generation")
             if value not in _SCHEMA_FORMATS:
                 _fail("--format must be 'anthropic' or 'openai'")
             schema_format = value

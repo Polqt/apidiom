@@ -1,0 +1,58 @@
+{
+  "stripe": {
+    "url": "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.yaml",
+    "description": "Stripe Payments API"
+  },
+  "github": {
+    "url": "https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.yaml",
+    "description": "GitHub REST API"
+  },
+  "openai": {
+    "url": "https://raw.githubusercontent.com/openai/openai-openapi/master/openapi.yaml",
+    "description": "OpenAI API"
+  },
+  "sendgrid": {
+    "url": "https://raw.githubusercontent.com/sendgrid/sendgrid-oai/main/oai.yaml",
+    "description": "SendGrid Email API"
+  },
+  "pagerduty": {
+    "url": "https://raw.githubusercontent.com/PagerDuty/api-schema/main/reference/REST/openapiv3.yaml",
+    "description": "PagerDuty Incident Management API"
+  },
+  "cloudflare": {
+    "url": "https://raw.githubusercontent.com/cloudflare/api-schemas/main/openapi.yaml",
+    "description": "Cloudflare API"
+  },
+  "twilio": {
+    "url": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/yaml/twilio_api_v2010.yaml",
+    "description": "Twilio Programmable API"
+  },
+  "discord": {
+    "url": "https://raw.githubusercontent.com/discord/discord-api-spec/main/specs/openapi.json",
+    "description": "Discord HTTP API"
+  },
+  "spotify": {
+    "url": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/spotify.com/1.0.0/openapi.yaml",
+    "description": "Spotify Web API"
+  },
+  "zoom": {
+    "url": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/zoom.us/2.0.0/openapi.yaml",
+    "description": "Zoom Video Conferencing API"
+  },
+  "notion": {
+    "url": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/notion.com/1.0.0/openapi.yaml",
+    "description": "Notion API"
+  },
+  "jira": {
+    "url": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/atlassian.com/jira/1001.0.0-SNAPSHOT/openapi.yaml",
+    "description": "Jira Cloud REST API"
+  },
+  "vercel": {
+    "url": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/vercel.com/0.0.1/openapi.yaml",
+    "description": "Vercel Deployment API"
+  },
+  "petstore": {
+    "url": "https://petstore3.swagger.io/api/v3/openapi.json",
+    "description": "Petstore (demo)"
+  }
+}
