@@ -4,14 +4,16 @@
   "description": "Turn any API into an MCP server in one command.",
   "type": "commonjs",
   "bin": {
-    "apidiom": "./dist/cli.js"
+    "apidiom": "dist/cli.js"
   },
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "dependencies": {
     "commander": "^12.0.0",
     "js-yaml": "^4.1.0"
