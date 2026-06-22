@@ -1,4 +1,4 @@
-type Doc = Record<string, unknown>;
+import type { Doc } from "../model";
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete", "head", "options"];
 

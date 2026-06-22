@@ -11,7 +11,7 @@ const program = new Command();
 program
   .name("apidiom")
   .description("Turn any API into an MCP server in one command.")
-  .version("0.2.0");
+  .version("0.2.2");
 
 const generate = program.command("generate").description("Generate code from an API spec");
 
@@ -25,8 +25,9 @@ generate
   .option("-o, --output <file>", "Write output to file (default: stdout)")
   .option("--tag <tag>", "Include only endpoints with this tag (repeatable)", collect, [])
   .option("--include <operationId>", "Include only this operationId (repeatable)", collect, [])
+  .option("--group-by-tag", "Prefix tool names with their OpenAPI tag (e.g. pets__list_pets)")
   .option("--list", "List available built-in services")
-  .action(async (source: string | undefined, opts: { output?: string; tag: string[]; include: string[]; list?: boolean }) => {
+  .action(async (source: string | undefined, opts: { output?: string; tag: string[]; include: string[]; groupByTag?: boolean; list?: boolean }) => {
     if (opts.list) {
       for (const [name, entry] of Object.entries(REGISTRY)) {
         process.stdout.write(`${name.padEnd(16)} ${entry.description}\n`);
@@ -46,10 +47,25 @@ generate
         (k) => REGISTRY[k].url === source || k === source.toLowerCase()
       );
       const auth = extractAuth(model, serviceName);
+      const hasUnsupportedAuth = model.authSchemes.some(
+        (s) => s.type === "oauth2" || s.type === "openIdConnect"
+      );
+      if (hasUnsupportedAuth && auth.length === 0) {
+        process.stderr.write(
+          `Warning: "${source}" uses OAuth2/OpenID Connect auth — not supported in generated code. API calls will be unauthenticated and likely return 401.\n`
+        );
+      }
       const code = generateMCPServer(model, auth, {
         tags: opts.tag.length > 0 ? opts.tag : undefined,
         include: opts.include.length > 0 ? opts.include : undefined,
+        groupByTag: opts.groupByTag,
       });
+
+      if (model.endpoints.length > 200) {
+        process.stderr.write(
+          `Warning: ${model.endpoints.length} endpoints found — consider filtering with --tag or --include to reduce tool count for Claude Desktop.\n`
+        );
+      }
 
       if (opts.output) {
         await fs.writeFile(opts.output, code, "utf-8");

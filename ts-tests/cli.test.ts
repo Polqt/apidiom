@@ -27,7 +27,7 @@ describe("CLI integration", () => {
 
   it("generate mcp <fixture> outputs valid JS", () => {
     const out = execSync(`node "${CLI}" generate mcp "${FIXTURE}"`).toString();
-    expect(out).toContain("listPets");
+    expect(out).toContain("list_pets");
     expect(out).toContain("tools/list");
     expect(out).toContain("tools/call");
   });

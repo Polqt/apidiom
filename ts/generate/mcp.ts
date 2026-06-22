@@ -1,8 +1,58 @@
-import type { APIEndpoint, APIModel, AuthConfig } from "../model";
+import type { APIEndpoint, APIModel, AuthConfig, OpenAPIParam } from "../model";
 
 export interface MCPGenOptions {
   tags?: string[];
   include?: string[];
+  groupByTag?: boolean;
+}
+
+export function normalizeToolName(operationId: string): string {
+  // Strip standalone version segments like V1, V2, V10
+  let name = operationId.replace(/V\d+/g, "");
+  // PascalCase/camelCase → snake_case
+  name = name
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+    .replace(/([a-z\d])([A-Z])/g, "$1_$2")
+    .toLowerCase()
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+  return name || operationId.toLowerCase();
+}
+
+export function enrichDescription(
+  summary: string | undefined,
+  description: string | undefined,
+  params: OpenAPIParam[]
+): string {
+  const parts: string[] = [];
+
+  const cleanSummary = summary?.replace(/\.$/, "").trim();
+  if (cleanSummary) parts.push(cleanSummary);
+
+  if (description) {
+    const firstSentence = description.split(/\.\s+/)[0].replace(/\.$/, "").trim();
+    if (firstSentence && firstSentence !== cleanSummary) {
+      parts.push(firstSentence);
+    }
+  }
+
+  const requiredParams = params.filter(
+    (p) => p.required && (p.in === "path" || p.in === "query")
+  );
+  if (requiredParams.length > 0) {
+    parts.push(`Params: ${requiredParams.map((p) => `${p.name} (required)`).join(", ")}`);
+  }
+
+  return parts.length > 0 ? parts.join(". ") + "." : "";
+}
+
+function deduplicateNames(names: string[]): string[] {
+  const seen: Record<string, number> = {};
+  return names.map((name) => {
+    const count = seen[name] ?? 0;
+    seen[name] = count + 1;
+    return count === 0 ? name : `${name}_${count + 1}`;
+  });
 }
 
 export function generateMCPServer(
@@ -12,6 +62,25 @@ export function generateMCPServer(
 ): string {
   const endpoints = filterEndpoints(model.endpoints, opts);
   const serverName = toSlug(model.title);
+
+  // Pre-compute normalized tool names and deduplicate
+  const rawNames = endpoints.map((ep) => {
+    const base = normalizeToolName(ep.operationId);
+    if (opts.groupByTag && ep.tags.length > 0) {
+      return `${ep.tags[0]}__${base}`;
+    }
+    return base;
+  });
+  const names = deduplicateNames(rawNames);
+
+  // Warn on stderr if any names were renamed due to collision
+  rawNames.forEach((raw, i) => {
+    if (names[i] !== raw) {
+      process.stderr.write(
+        `Warning: duplicate tool name "${raw}" renamed to "${names[i]}"\n`
+      );
+    }
+  });
 
   const parts: string[] = [
     `"use strict";`,
@@ -23,7 +92,7 @@ export function generateMCPServer(
     ``,
     generateAuthSection(auth),
     generateRequestHelper(),
-    generateToolsArray(endpoints, model.serverUrl, auth),
+    generateToolsArray(endpoints, names, model.serverUrl, auth),
     generateMCPHandler(serverName, model.version),
   ];
 
@@ -84,18 +153,23 @@ function _request(method, url, headers, body) {
 
 function generateToolsArray(
   endpoints: APIEndpoint[],
+  names: string[],
   serverUrl: string,
   auth: AuthConfig[]
 ): string {
-  const tools = endpoints.map((ep) => generateTool(ep, serverUrl, auth));
+  const tools = endpoints.map((ep, i) => generateTool(ep, names[i], serverUrl, auth));
   return `// --- Tools ---\nvar _TOOLS = [\n${tools.join(",\n")}\n];\n`;
 }
 
-function generateTool(ep: APIEndpoint, serverUrl: string, auth: AuthConfig[]): string {
+function generateTool(
+  ep: APIEndpoint,
+  toolName: string,
+  serverUrl: string,
+  auth: AuthConfig[]
+): string {
   const pathParams = ep.parameters.filter((p) => p.in === "path");
   const queryParams = ep.parameters.filter((p) => p.in === "query");
 
-  // Build JSON schema for the tool's inputSchema
   const schemaProps: Record<string, unknown> = {};
   const required: string[] = [];
 
@@ -113,11 +187,9 @@ function generateTool(ep: APIEndpoint, serverUrl: string, auth: AuthConfig[]): s
     if (ep.requestBody.required) required.push("body");
   }
 
-  // Split auth into header auth and query auth
   const headerAuth = auth.filter((a) => !a.queryParam);
   const queryAuth = auth.filter((a) => a.queryParam);
 
-  // Build auth header object literal (plain JS object, no template literals)
   const authHeaderEntries = headerAuth.map((a) => {
     const headerValue = buildHeaderValue(a);
     return `      ${JSON.stringify(a.headerName)}: ${headerValue}`;
@@ -127,10 +199,8 @@ function generateTool(ep: APIEndpoint, serverUrl: string, auth: AuthConfig[]): s
       ? `{\n${authHeaderEntries.join(",\n")}\n    }`
       : "{}";
 
-  // Build URL path expression using string concatenation (safe, no template literals)
   const urlParts = buildUrlParts(serverUrl, ep.path, pathParams);
 
-  // Build query string logic
   const queryLines: string[] = [];
   queryLines.push(`    var _q = new URLSearchParams();`);
   for (const p of queryParams) {
@@ -146,10 +216,10 @@ function generateTool(ep: APIEndpoint, serverUrl: string, auth: AuthConfig[]): s
   const bodyArg = ep.requestBody ? `args["body"]` : "undefined";
   const urlExpr = `(${urlParts}) + _qs`;
 
-  const description = ep.summary ?? ep.description ?? ep.operationId;
+  const description = enrichDescription(ep.summary, ep.description, ep.parameters);
 
   return `  {
-    name: ${JSON.stringify(ep.operationId)},
+    name: ${JSON.stringify(toolName)},
     description: ${JSON.stringify(description)},
     inputSchema: ${JSON.stringify({ type: "object", properties: schemaProps, required })},
     call: function(args) {
@@ -210,17 +280,20 @@ function generateMCPHandler(serverName: string, version: string): string {
   return `// --- MCP Protocol ---
 var _buf = "";
 process.stdin.setEncoding("utf8");
+function _processLine(line) {
+  if (!line.trim()) return;
+  var msg;
+  try { msg = JSON.parse(line); } catch(e) { return; }
+  _handle(msg).catch(function(e) { process.stderr.write(e.message + "\\n"); });
+}
 process.stdin.on("data", function(chunk) {
   _buf += chunk;
   var lines = _buf.split("\\n");
   _buf = lines.pop() || "";
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i];
-    if (!line.trim()) continue;
-    var msg;
-    try { msg = JSON.parse(line); } catch(e) { continue; }
-    _handle(msg).catch(function(e) { process.stderr.write(e.message + "\\n"); });
-  }
+  for (var i = 0; i < lines.length; i++) { _processLine(lines[i]); }
+});
+process.stdin.on("end", function() {
+  if (_buf.trim()) _processLine(_buf);
 });
 
 function _send(obj) { process.stdout.write(JSON.stringify(obj) + "\\n"); }

@@ -1,3 +1,5 @@
+export type Doc = Record<string, unknown>;
+
 export interface OpenAPIParam {
   name: string;
   in: "path" | "query" | "header" | "cookie";

@@ -1,6 +1,4 @@
-import type { APIEndpoint, APIModel, AuthScheme, OpenAPIParam, RequestBody } from "../model";
-
-type Doc = Record<string, unknown>;
+import type { APIEndpoint, APIModel, AuthScheme, OpenAPIParam, RequestBody, Doc } from "../model";
 
 export function parseOpenAPI(doc: Doc): APIModel {
   if (typeof doc["openapi"] !== "string" || !doc["openapi"].startsWith("3")) {
