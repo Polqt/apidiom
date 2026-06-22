@@ -11,36 +11,20 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.11"
-
-      - name: Install build tooling
-        run: python -m pip install --upgrade build twine
-
-      - name: Build package
-        run: python -m build
-
-      - name: Validate distributions
-        run: python -m twine check dist/*
-
-      # PyPI Trusted Publishing setup required before this workflow can publish:
-      # - Add a pending publisher under your PyPI account for project: apidiom
-      # - Owner/repository: poyhi/apidiom
-      # - Workflow: .github/workflows/release.yml
-      # - Environment: pypi
-      # The first successful OIDC publish creates the PyPI project and converts
-      # the pending publisher into a normal project publisher.
-      # Do not configure a PyPI API token; GitHub OIDC supplies the identity.
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          attestations: true
+          node-version: "20"
+          cache: "npm"
+          registry-url: "https://registry.npmjs.org"
+      - name: Install
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Test
+        run: npm test
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
