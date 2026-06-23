@@ -4,7 +4,8 @@ import path from "path";
 import yaml from "js-yaml";
 import { parseOpenAPI } from "../../ts/ingest/parse";
 import { generateToolSchema } from "../../ts/generate/schema";
-import type { APIModel } from "../../ts/model";
+import { buildInputSchema, deduplicateToolNames } from "../../ts/generate/tools";
+import type { APIEndpoint, APIModel } from "../../ts/model";
 
 const FIXTURE_PATH = path.resolve(__dirname, "../fixtures/petstore.yaml");
 const doc = yaml.load(fs.readFileSync(FIXTURE_PATH, "utf-8")) as Record<string, unknown>;
@@ -111,5 +112,60 @@ describe("generateToolSchema", () => {
       "get_pets",
       "get_pets_2",
     ]);
+  });
+});
+
+describe("deduplicateToolNames", () => {
+  it("returns unique names unchanged", () => {
+    expect(deduplicateToolNames(["foo", "bar", "baz"])).toEqual(["foo", "bar", "baz"]);
+  });
+
+  it("suffixes duplicates starting at _2", () => {
+    expect(deduplicateToolNames(["foo", "foo", "foo"])).toEqual(["foo", "foo_2", "foo_3"]);
+  });
+
+  it("does not collide when name_2 already exists in input", () => {
+    expect(deduplicateToolNames(["foo", "foo_2", "foo"])).toEqual(["foo", "foo_2", "foo_3"]);
+  });
+});
+
+describe("buildInputSchema", () => {
+  it("includes header params in schema", () => {
+    const endpoint: APIEndpoint = {
+      path: "/test",
+      method: "GET",
+      operationId: "test",
+      tags: [],
+      parameters: [
+        {
+          name: "X-Custom-Header",
+          in: "header",
+          required: true,
+          schema: { type: "string" },
+        },
+      ],
+    };
+    const schema = buildInputSchema(endpoint);
+    expect(schema.properties["X-Custom-Header"]).toBeDefined();
+    expect(schema.required).toContain("X-Custom-Header");
+  });
+
+  it("excludes cookie params from schema", () => {
+    const endpoint: APIEndpoint = {
+      path: "/test",
+      method: "GET",
+      operationId: "test",
+      tags: [],
+      parameters: [
+        {
+          name: "session",
+          in: "cookie",
+          required: false,
+          schema: { type: "string" },
+        },
+      ],
+    };
+    const schema = buildInputSchema(endpoint);
+    expect(schema.properties["session"]).toBeUndefined();
   });
 });

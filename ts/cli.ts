@@ -12,7 +12,7 @@ const program = new Command();
 program
   .name("apidiom")
   .description("Turn any API into an MCP server in one command.")
-  .version("0.2.2");
+  .version((require("../package.json") as { version: string }).version);
 
 const generate = program.command("generate").description("Generate code from an API spec");
 

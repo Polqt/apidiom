@@ -176,4 +176,16 @@ describe("generateMCPServer — deduplication", () => {
     expect(output).toContain('"get_pets"');
     expect(output).toContain('"get_pets_2"');
   });
+
+  it("generates no triple blank lines when no auth schemes present", () => {
+    const model: import("../../ts/model").APIModel = {
+      title: "Test API",
+      version: "1.0.0",
+      serverUrl: "https://api.test.com",
+      endpoints: [],
+      authSchemes: [],
+    };
+    const output = generateMCPServer(model, []);
+    expect(output).not.toMatch(/\n\n\n/);
+  });
 });

@@ -71,11 +71,17 @@ export function filterEndpoints(
 }
 
 export function deduplicateToolNames(names: string[]): string[] {
-  const seen: Record<string, number> = {};
+  const seen = new Set<string>();
   return names.map((name) => {
-    const count = seen[name] ?? 0;
-    seen[name] = count + 1;
-    return count === 0 ? name : `${name}_${count + 1}`;
+    if (!seen.has(name)) {
+      seen.add(name);
+      return name;
+    }
+    let i = 2;
+    let candidate = `${name}_${i}`;
+    while (seen.has(candidate)) candidate = `${name}_${++i}`;
+    seen.add(candidate);
+    return candidate;
   });
 }
 
@@ -84,7 +90,7 @@ export function buildInputSchema(endpoint: APIEndpoint): ToolMetadata["inputSche
   const required: string[] = [];
 
   for (const p of endpoint.parameters) {
-    if (p.in === "path" || p.in === "query") {
+    if (p.in === "path" || p.in === "query" || p.in === "header") {
       properties[p.name] = p.description
         ? { ...p.schema, description: p.description }
         : { ...p.schema };

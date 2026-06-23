@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import path from "path";
 import { execSync, spawn } from "child_process";
 import fs from "fs";
+import fsp from "fs/promises";
 import http from "http";
 import os from "os";
 import type { AddressInfo } from "net";
@@ -193,6 +194,23 @@ describe("CLI integration", () => {
       });
     });
   }, 10000);
+
+  it("reports version from package.json", () => {
+    const pkg = require("../package.json") as { version: string };
+    const output = execSync(`node "${CLI}" --version`, { cwd: path.resolve(__dirname, "..") }).toString().trim();
+    expect(output).toBe(pkg.version);
+  });
+
+  it("schema command validates --format before fetching spec", async () => {
+    const cliPath = path.resolve(__dirname, "../ts/cli.ts");
+    const src = await fsp.readFile(cliPath, "utf-8");
+    const schemaSection = src.slice(src.indexOf('.command("schema'));
+    const formatCheckIdx = schemaSection.indexOf('opts.format !== "anthropic"');
+    const fetchIdx = schemaSection.indexOf("fetchSpec");
+    expect(formatCheckIdx).toBeGreaterThan(-1);
+    expect(fetchIdx).toBeGreaterThan(-1);
+    expect(formatCheckIdx).toBeLessThan(fetchIdx);
+  });
 });
 
 function bookApiSpec(port: number): string {

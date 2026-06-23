@@ -18,20 +18,36 @@ export async function fetchSpec(source: string): Promise<Record<string, unknown>
 }
 
 async function fetchRemote(url: string): Promise<Record<string, unknown>> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-  const text = await res.text();
-  return parseText(text, url);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    const text = await res.text();
+    return parseSpec(text, url);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function fetchLocal(filePath: string): Promise<Record<string, unknown>> {
   const text = await fs.readFile(filePath, "utf-8");
-  return parseText(text, filePath);
+  return parseSpec(text, filePath);
 }
 
-function parseText(text: string, source: string): Record<string, unknown> {
-  if (source.endsWith(".json")) {
-    return JSON.parse(text) as Record<string, unknown>;
+export function parseSpec(text: string, source: string): Record<string, unknown> {
+  const trimmed = text.trimStart();
+  const looksLikeJson = trimmed.startsWith("{") || trimmed.startsWith("[") || source.endsWith(".json");
+  if (looksLikeJson) {
+    const parsed = JSON.parse(text);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      throw new Error("JSON document is not an object");
+    }
+    return parsed as Record<string, unknown>;
   }
-  return yaml.load(text) as Record<string, unknown>;
+  const result = yaml.load(text);
+  if (typeof result !== "object" || result === null || Array.isArray(result)) {
+    throw new Error("YAML document is not an object");
+  }
+  return result as Record<string, unknown>;
 }
