@@ -4,6 +4,7 @@ import { fetchSpec } from "./ingest/fetch";
 import { parseOpenAPI } from "./ingest/parse";
 import { extractAuth } from "./auth";
 import { generateMCPServer } from "./generate/mcp";
+import { generateToolSchema, type SchemaFormat } from "./generate/schema";
 import { REGISTRY } from "./registry";
 
 const program = new Command();
@@ -72,6 +73,44 @@ generate
         process.stderr.write(`Written to ${opts.output}\n`);
       } else {
         process.stdout.write(code);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`Error: ${msg}\n`);
+      process.exit(1);
+    }
+  });
+
+generate
+  .command("schema <source>")
+  .description("Generate Anthropic or OpenAI JSON tool schemas")
+  .requiredOption("--format <format>", "Tool schema format: anthropic or openai")
+  .option("-o, --output <file>", "Write output to file (default: stdout)")
+  .option("--tag <tag>", "Include only endpoints with this tag (repeatable)", collect, [])
+  .option("--include <operationId>", "Include only this operationId (repeatable)", collect, [])
+  .action(async (
+    source: string,
+    opts: { format: string; output?: string; tag: string[]; include: string[] }
+  ) => {
+    if (opts.format !== "anthropic" && opts.format !== "openai") {
+      process.stderr.write("Error: --format must be anthropic or openai\n");
+      process.exit(1);
+    }
+
+    try {
+      const doc = await fetchSpec(source);
+      const model = parseOpenAPI(doc);
+      const json = generateToolSchema(model, {
+        format: opts.format as SchemaFormat,
+        tags: opts.tag.length > 0 ? opts.tag : undefined,
+        include: opts.include.length > 0 ? opts.include : undefined,
+      });
+
+      if (opts.output) {
+        await fs.writeFile(opts.output, json, "utf-8");
+        process.stderr.write(`Written to ${opts.output}\n`);
+      } else {
+        process.stdout.write(json);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

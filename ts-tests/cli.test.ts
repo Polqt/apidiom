@@ -51,6 +51,33 @@ describe("CLI integration", () => {
     fs.unlinkSync(outFile);
   });
 
+  it("generate schema prints Anthropic JSON", () => {
+    const out = execSync(
+      `node "${CLI}" generate schema "${FIXTURE}" --format anthropic`
+    ).toString();
+    const tools = JSON.parse(out);
+    expect(tools[0].name).toBe("list_pets");
+    expect(tools[0].input_schema.type).toBe("object");
+  });
+
+  it("generate schema --output writes OpenAI JSON", () => {
+    const outFile = path.resolve(__dirname, "petstore-tools.json");
+    execSync(
+      `node "${CLI}" generate schema "${FIXTURE}" --format openai --output "${outFile}"`
+    );
+    const tools = JSON.parse(fs.readFileSync(outFile, "utf8"));
+    expect(tools[0].type).toBe("function");
+    expect(tools[0].function.name).toBe("list_pets");
+    fs.unlinkSync(outFile);
+  });
+
+  it("generate schema requires --format", () => {
+    let threw = false;
+    try { execSync(`node "${CLI}" generate schema "${FIXTURE}"`); }
+    catch { threw = true; }
+    expect(threw).toBe(true);
+  });
+
   it("generate mcp unknown-service exits 1", () => {
     let threw = false;
     try { execSync(`node "${CLI}" generate mcp totally-unknown-svc-xyz`); }

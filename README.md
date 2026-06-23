@@ -37,9 +37,14 @@ apidiom generate mcp ./my-api.yaml --output my-api-mcp.js
 # From a URL
 apidiom generate mcp https://example.com/openapi.yaml --output out.js
 
+# Export raw SDK tool schemas
+apidiom generate schema petstore --format anthropic --output tools.json
+apidiom generate schema petstore --format openai --output tools.json
+
 # Filter to a tag or specific operations
 apidiom generate mcp github --tag repos
 apidiom generate mcp openai --include createChatCompletion --output openai-mcp.js
+apidiom generate schema petstore --format anthropic --tag pets
 
 # stdout (pipe-friendly; on Windows PowerShell use --output instead of >)
 apidiom generate mcp petstore
@@ -94,6 +99,10 @@ Output is a **single self-contained JS file** — zero npm dependencies, Node.js
 
 Auth env var names are derived from the security scheme name:
 `STRIPE_BEARER_TOKEN`, `GITHUB_BEARER_TOKEN`, `OPENAI_BEARER_TOKEN`, etc.
+
+## Generated Tool Schemas
+
+`generate schema` writes portable JSON tool definitions for raw Anthropic or OpenAI SDK usage. Auth is not included in schema JSON; your execution code owns API credentials.
 
 ## Known Limitations
 
