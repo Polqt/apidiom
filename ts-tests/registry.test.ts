@@ -12,6 +12,12 @@ describe("resolveSource", () => {
     expect(resolveSource("/abs/path/spec.json")).toBe("/abs/path/spec.json");
   });
 
+  it("returns existing bare relative file paths unchanged", () => {
+    expect(resolveSource("ts-tests/fixtures/petstore.yaml")).toBe(
+      "ts-tests/fixtures/petstore.yaml"
+    );
+  });
+
   it("resolves 'stripe' to its spec URL", () => {
     const result = resolveSource("stripe");
     expect(result).toBe(REGISTRY["stripe"].url);

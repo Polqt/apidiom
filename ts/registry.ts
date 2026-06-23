@@ -1,4 +1,5 @@
 import registryData from "./registry.json";
+import { existsSync } from "fs";
 
 export interface RegistryEntry {
   url: string;
@@ -13,6 +14,9 @@ const WINDOWS_ABS_PATH = /^[A-Za-z]:[/\\]/;
 
 export function resolveSource(source: string): string {
   if (URL_PREFIXES.some((p) => source.startsWith(p)) || WINDOWS_ABS_PATH.test(source)) {
+    return source;
+  }
+  if (existsSync(source)) {
     return source;
   }
   const entry = REGISTRY[source.toLowerCase()];

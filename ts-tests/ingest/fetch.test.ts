@@ -2,12 +2,18 @@ import { describe, it, expect } from "vitest";
 import { fetchSpec } from "../../ts/ingest/fetch";
 
 const FIXTURE = "./ts-tests/fixtures/petstore.yaml";
+const BARE_RELATIVE_FIXTURE = "ts-tests/fixtures/petstore.yaml";
 
 describe("fetchSpec", () => {
   it("loads and parses a local YAML file", async () => {
     const doc = await fetchSpec(FIXTURE);
     expect(doc).toHaveProperty("openapi");
     expect((doc as { info: { title: string } }).info.title).toBe("Swagger Petstore");
+  });
+
+  it("loads bare relative local YAML paths", async () => {
+    const doc = await fetchSpec(BARE_RELATIVE_FIXTURE);
+    expect(doc).toHaveProperty("openapi");
   });
 
   it("throws a clear error for a missing file", async () => {
