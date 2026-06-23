@@ -1,6 +1,6 @@
 {
   "name": "apidiom",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Turn any API into an MCP server in one command.",
   "type": "commonjs",
   "bin": {
@@ -14,7 +14,15 @@
   "files": [
     "dist"
   ],
-  "keywords": ["mcp", "openapi", "ai", "llm", "api", "claude", "tool-calling"],
+  "keywords": [
+    "mcp",
+    "openapi",
+    "ai",
+    "llm",
+    "api",
+    "claude",
+    "tool-calling"
+  ],
   "homepage": "https://github.com/poyhi/apidiom",
   "repository": {
     "type": "git",
