@@ -1,0 +1,129 @@
+---
+import Icon from '../../node_modules/@astrojs/starlight/user-components/Icon.astro';
+
+const options = [
+  { label: Astro.locals.t('themeSelect.dark'), selected: false, value: 'dark' },
+  { label: Astro.locals.t('themeSelect.light'), selected: false, value: 'light' },
+  { label: Astro.locals.t('themeSelect.auto'), selected: true, value: 'auto' },
+];
+---
+
+<starlight-theme-select>
+  <label style="--sl-select-width: 6.25em">
+    <span class="sr-only">{Astro.locals.t('themeSelect.accessibleLabel')}</span>
+    <select autocomplete="off">
+      {options.map(({ value, selected, label }) => <option value={value} selected={selected} set:html={label} />)}
+    </select>
+    <Icon name="down-caret" class="icon caret" />
+  </label>
+</starlight-theme-select>
+
+<script is:inline>
+  StarlightThemeProvider.updatePickers();
+</script>
+
+<script>
+  type Theme = 'auto' | 'dark' | 'light';
+
+  declare const StarlightThemeProvider: {
+    updatePickers: (theme?: Theme) => void;
+  };
+
+  const storageKey = 'starlight-theme';
+
+  const parseTheme = (theme: unknown): Theme =>
+    theme === 'auto' || theme === 'dark' || theme === 'light' ? theme : 'auto';
+
+  const loadTheme = (): Theme =>
+    parseTheme(typeof localStorage !== 'undefined' && localStorage.getItem(storageKey));
+
+  function storeTheme(theme: Theme): void {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(storageKey, theme === 'light' || theme === 'dark' ? theme : '');
+    }
+  }
+
+  const getPreferredColorScheme = (): Theme =>
+    matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+
+  function onThemeChange(theme: Theme): void {
+    StarlightThemeProvider.updatePickers(theme);
+    document.documentElement.dataset.theme = theme === 'auto' ? getPreferredColorScheme() : theme;
+    storeTheme(theme);
+  }
+
+  matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+    if (loadTheme() === 'auto') onThemeChange('auto');
+  });
+
+  class StarlightThemeSelect extends HTMLElement {
+    constructor() {
+      super();
+      onThemeChange(loadTheme());
+      this.querySelector('select')?.addEventListener('change', (event) => {
+        if (event.currentTarget instanceof HTMLSelectElement) {
+          onThemeChange(parseTheme(event.currentTarget.value));
+        }
+      });
+    }
+  }
+
+  customElements.define('starlight-theme-select', StarlightThemeSelect);
+</script>
+
+<style>
+  @layer starlight.core {
+    label {
+      --sl-caret-size: 1.25rem;
+      --sl-inline-padding: 0.5rem;
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      color: var(--sl-color-gray-1);
+    }
+
+    label:hover {
+      color: var(--sl-color-gray-2);
+    }
+
+    .icon {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+
+    select {
+      border: 0;
+      padding-block: 0.625rem;
+      padding-inline: var(--sl-inline-padding)
+        calc(var(--sl-caret-size) + var(--sl-inline-padding) + 0.25rem);
+      margin-inline: calc(var(--sl-inline-padding) * -1);
+      width: calc(var(--sl-select-width) + var(--sl-inline-padding) * 2);
+      background-color: transparent;
+      text-overflow: ellipsis;
+      color: inherit;
+      cursor: pointer;
+      appearance: none;
+    }
+
+    option {
+      background-color: var(--sl-color-bg-nav);
+      color: var(--sl-color-gray-1);
+    }
+
+    @media (min-width: 50rem) {
+      select {
+        font-size: var(--sl-text-sm);
+      }
+    }
+  }
+
+  @layer starlight.components {
+    .caret {
+      font-size: var(--sl-caret-size);
+      inset-inline-end: 0;
+    }
+  }
+</style>

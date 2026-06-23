@@ -3,43 +3,49 @@ title: Troubleshooting
 description: Common errors and what to do next.
 ---
 
-## Clipboard backend missing
+## Source Not Found
 
-On headless Linux, `pyperclip` may not find a clipboard backend. When
-`--clipboard` is used, `apidiom` catches that failure, prints a clear message,
-and falls back to stdout.
-
-Use `--output client.py` when running in CI or a headless shell.
-
-## Java not found
-
-The primary codegen path requires Java and `openapi-generator-cli`. If either is
-missing, `--codegen auto` selects the no-Java fallback.
-
-If you force the primary path:
+Use `./` for local files when a path could be confused with a built-in service
+name.
 
 ```bash
-apidiom generate ./openapi.yaml --codegen openapi-generator --output generated-client
+apidiom generate mcp ./openapi.yaml --output api-mcp.js
 ```
 
-and the tool is unavailable, `apidiom` fails fast with install guidance instead
-of silently falling back.
+## Missing Source
 
-## Provider not ready
-
-Check provider readiness:
+`generate mcp` requires a source unless you are listing built-in services.
 
 ```bash
-apidiom check --provider ollama
-apidiom check --provider gemini
+apidiom generate mcp --list
+apidiom generate mcp stripe --output stripe-mcp.js
 ```
 
-For Gemini, set `GEMINI_API_KEY`. For Ollama, start the local daemon and pull
-the configured model.
+## Missing Schema Format
 
-## Repair-loop failure
+Raw SDK schema export requires an explicit format.
 
-When unstructured extraction produces invalid OpenAPI, `apidiom` asks the
-provider to repair the document up to three times. If validation still fails,
-the error surfaces the validator messages and saves the best candidate spec so
-you can inspect it.
+```bash
+apidiom generate schema ./openapi.yaml --format openai
+apidiom generate schema ./openapi.yaml --format anthropic
+```
+
+If the format is not `openai` or `anthropic`, apidiom exits with a clear error.
+
+## Too Many Tools
+
+Very large specs can produce hundreds of tools. Filter first:
+
+```bash
+apidiom generate mcp github --tag repos --output github-repos-mcp.js
+apidiom generate schema stripe --format openai --include createPaymentIntent
+```
+
+Use `--tag` for broad resource groups. Use `--include` when you know the exact
+operation IDs.
+
+## Runtime Auth Error
+
+Generated MCP servers read supported credentials from environment variables. If
+a required value is missing, the generated server prints the missing variable
+name and exits.

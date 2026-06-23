@@ -13,7 +13,9 @@ export default defineConfig({
       title: 'apidiom',
       customCss: ['./src/styles/custom.css'],
       components: {
+        Head: './src/components/Head.astro',
         SidebarSublist: './src/components/SidebarSublist.astro',
+        ThemeSelect: './src/components/ThemeSelect.astro',
       },
       disable404Route: true,
       sidebar: [
@@ -24,17 +26,10 @@ export default defineConfig({
           ],
         },
         {
-          label: 'Concepts',
-          items: [
-            { label: 'Providers & Privacy', slug: 'providers-privacy' },
-            { label: 'Unverified Fields', slug: 'unverified-fields' },
-          ],
-        },
-        {
           label: 'Reference',
           items: [
-            { label: 'Web UI', slug: 'web-ui' },
             { label: 'MCP Server', slug: 'mcp-server' },
+            { label: 'JSON Schema Export', slug: 'schema-export' },
           ],
         },
         {

@@ -1,122 +1,88 @@
 ---
 title: Quickstart
-description: Install apidiom and generate a client from a clean spec or messy docs.
+description: Install apidiom and generate agent tools from any OpenAPI spec.
 ---
 
 ## Install
 
-On Windows:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
-```
-
-On macOS/Linux:
+Requires Node.js 18+.
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -e ".[dev]"
+npm install -g apidiom
 ```
 
-For the primary codegen path, install Java and `openapi-generator-cli`. If Java
-is not available, `apidiom` can use its no-Java fallback:
-`datamodel-code-generator` for pydantic models plus a minimal `httpx` wrapper
-template.
-
-## Generate from a clean OpenAPI spec
+Or use without installing:
 
 ```bash
-apidiom generate ./openapi.yaml --output client.py --codegen builtin
+npx apidiom generate mcp stripe --output stripe-mcp.js
 ```
 
-The default input kind is `auto`. A clean JSON or YAML OpenAPI spec is detected
-as `openapi`.
+## List built-in services
+
+```bash
+apidiom generate mcp --list
+```
+
+You can also pass a local OpenAPI JSON/YAML file or a URL.
 
 ## Generate an MCP server
 
 ```bash
 apidiom generate mcp ./openapi.yaml --list
-apidiom generate mcp ./openapi.yaml --include GET:/pets --check --output pets_mcp.py
-python pets_mcp.py
+apidiom generate mcp ./openapi.yaml --include listPets --output pets-mcp.js
+node pets-mcp.js
 ```
 
-Use `--include METHOD:/path/{param}` or `--tag name` for large specs.
-`--check` compiles the generated server and prints the exported tool count
-without calling the API.
+Use `--include operationId` or `--tag name` for large specs.
 
-## Generate other agent tool formats
+The generated file is standalone JavaScript. It speaks MCP over stdio and uses
+Node's built-in `http` and `https` modules for API calls.
+
+## Generate JSON tool schemas
 
 ```bash
-apidiom generate langchain ./openapi.yaml --tag pets --output pet_tools.py
 apidiom generate schema ./openapi.yaml --format openai --output tools.json
 apidiom generate schema ./openapi.yaml --format anthropic
 ```
 
-Use multiple specs when one agent needs tools from more than one API:
-
-```bash
-apidiom generate mcp ./stripe.yaml ./github.yaml --output unified_mcp
-```
-
-LangGraph uses LangChain tools directly, so the same output works for both:
-
-```python
-from pet_tools import list_pets
-
-tools = [list_pets]
-```
+Schema export writes only tool names, descriptions, and input schemas. It does
+not encode auth. Keep auth, retries, and execution behavior in your own runtime
+code when using raw SDK schemas.
 
 Real public spec smoke checks used during development:
 
 ```bash
-apidiom generate langchain \
-  https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json \
-  --include GET:/repos/{owner}/{repo} \
-  --output github_tools.py
+apidiom generate mcp \
+  https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/examples/v3.0/petstore.yaml \
+  --include listPets \
+  --output petstore-mcp.js
 
 apidiom generate schema \
-  https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json \
-  --format anthropic \
-  --include POST:/v1/payment_intents \
-  --output stripe_tools.json
+  https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/examples/v3.0/petstore.yaml \
+  --format openai \
+  --include listPets \
+  --output petstore-tools.json
 ```
 
-Expected generated tool names from those specs: `repos_get` and
-`post_payment_intents`.
+Expected generated tool name from that spec: `list_pets`.
 
-If you only know an API base URL, apidiom tries common OpenAPI locations:
+## Use a built-in service
 
 ```bash
-apidiom generate mcp https://api.example.com --output api_mcp.py
+apidiom generate schema stripe --format anthropic --tag PaymentIntents --output stripe-tools.json
+apidiom generate mcp github --tag repos --output github-mcp.js
 ```
 
-For sparse specs, enrich generated tool descriptions with an LLM provider:
+Some APIs require auth for runtime calls. Generated MCP servers read supported
+auth values from environment variables and print a clear error when required
+values are missing.
+
+## Filter generated tools
 
 ```bash
-apidiom --provider ollama generate mcp ./openapi.yaml --enrich-docs --output api_mcp.py
+apidiom generate mcp ./openapi.yaml --tag pets --output pets-mcp.js
+apidiom generate schema ./openapi.yaml --format openai --include listPets
 ```
 
-## Generate from messy docs
-
-```bash
-apidiom generate https://docs.example.com/api \
-  --provider ollama \
-  --output client.py \
-  --codegen builtin
-```
-
-Messy docs are detected as `unstructured`. Use `--input-kind openapi` or
-`--input-kind unstructured` only when you need to override detection.
-
-Use `ollama` for private docs. Use `gemini` only for public docs where the
-privacy tradeoff is acceptable.
-
-## Check a provider
-
-```bash
-apidiom check --provider ollama
-apidiom check --provider gemini
-```
+Use tags to keep whole resource groups. Use includes when you already know the
+operation IDs you want.

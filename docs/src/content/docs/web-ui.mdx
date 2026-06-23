@@ -1,41 +1,9 @@
 ---
 title: Web UI
-description: Run the stateless FastAPI web UI and call its JSON endpoint.
+description: Archived roadmap note for the old Python web UI.
 ---
 
-Run the web UI:
+This page is archived. The current project ships a TypeScript CLI and docs site,
+not a hosted web UI.
 
-```bash
-uvicorn apidiom.web.app:app
-```
-
-The web UI is a thin presentation layer over `pipeline.generate_client`. It is
-stateless: no accounts, no login, no database, no sessions, no payments, and no
-server-side output files.
-
-The page accepts one input source at a time:
-
-- a URL or local path field
-- or an uploaded file
-
-It returns generated code in the browser, along with the codegen tier and any
-unverified fields. The input type dropdown defaults to `auto`, which uses the
-same conservative detection as the CLI and MCP server.
-
-## JSON endpoint
-
-Use `POST /generate?format=json` for agent or script calls. It returns:
-
-```json
-{
-  "code": "...",
-  "unknowns": [],
-  "tier": "builtin",
-  "notes": [],
-  "input_kind": "openapi",
-  "input_kind_source": "detected"
-}
-```
-
-The same handler also returns JSON when the request `Accept` header includes
-`application/json`.
+Use [Quickstart](/quickstart/) for current CLI commands.

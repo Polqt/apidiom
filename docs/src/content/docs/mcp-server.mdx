@@ -1,120 +1,80 @@
 ---
 title: MCP Server
-description: Connect agents to apidiom through the Model Context Protocol.
+description: Generate standalone JavaScript MCP servers from OpenAPI specs.
 ---
 
-`apidiom` includes a stateless MCP server that exposes the same generation
-pipeline used by the CLI and web UI.
-
-Run it with:
+`apidiom generate mcp` converts selected OpenAPI operations into a standalone
+JavaScript MCP server.
 
 ```bash
-python -m apidiom.mcp.server
+apidiom generate mcp ./openapi.yaml --output api-mcp.js
+node api-mcp.js
 ```
 
-Example MCP client config:
+The generated file speaks MCP over stdio. MCP clients can call `tools/list` and
+`tools/call` against it.
+
+## Inputs
+
+Use a built-in service, local file, or URL:
+
+```bash
+apidiom generate mcp stripe --output stripe-mcp.js
+apidiom generate mcp ./openapi.yaml --output api-mcp.js
+apidiom generate mcp https://example.com/openapi.json --output api-mcp.js
+```
+
+## Filtering
+
+Large OpenAPI specs can create too many tools for an agent to inspect well.
+Filter before generating:
+
+```bash
+apidiom generate mcp github --tag repos --output github-repos-mcp.js
+apidiom generate mcp ./openapi.yaml --include listPets --output pets-mcp.js
+```
+
+`--tag` matches OpenAPI operation tags. `--include` matches operation IDs.
+
+## Generated Shape
+
+Generated MCP servers are plain CommonJS files. They include a `_TOOLS` registry
+and a small MCP stdio handler.
+
+```js
+var _TOOLS = [{
+  name: "list_pets",
+  description: "List pets",
+  inputSchema: {
+    type: "object",
+    properties: {
+      limit: { type: "integer" }
+    }
+  },
+  call: function(args) {
+    return _request("GET", "https://example.com/pets", {}, undefined);
+  }
+}];
+```
+
+## Auth
+
+Generated MCP servers read supported API credentials from environment variables
+at runtime. Schema export does not include auth because raw SDK execution code
+should own credentials, retries, and observability.
+
+## Claude Desktop
+
+After generating a server, point your MCP client at `node` and the generated
+file.
 
 ```json
 {
   "mcpServers": {
-    "apidiom": {
-      "command": "python",
-      "args": ["-m", "apidiom.mcp.server"]
+    "apidiom-api": {
+      "command": "node",
+      "args": ["/absolute/path/to/api-mcp.js"]
     }
   }
 }
 ```
-
-## Tool
-
-`generate_client(source, provider="null", lang="python", codegen="auto", input_kind=null)`
-
-Omit `input_kind` or pass `null` for shared auto-detection. Use
-`input_kind="openapi"` or `input_kind="unstructured"` only when you need an
-explicit override. The default matches the CLI and web UI.
-
-The tool returns:
-
-- `code`: generated client code
-- `tier`: the codegen tier that ran
-- `unverified_fields`: every field `apidiom` could not verify from the docs
-- `notes`: conflict notes from merge/repair steps
-- `privacy_warning`: the Gemini warning when `provider="gemini"`
-- `input_kind`: the input kind that ran, `openapi` or `unstructured`
-- `input_kind_source`: whether the kind was `detected` or `explicit`
-- `message`: a short status message
-
-The unverified fields are always returned. They are the trust signal for agents
-as well as humans.
-
-Provider behavior matches the CLI privacy model. The default provider is
-`null`. If an agent selects `gemini`, the response includes the warning that
-Gemini free-tier data may be used for training and should only be used for
-public docs.
-
-## Generate an MCP server from OpenAPI
-
-`apidiom` can also turn an OpenAPI spec into a runnable MCP server:
-
-```bash
-apidiom generate mcp ./openapi.yaml --output api_mcp.py
-python api_mcp.py
-```
-
-For large public specs, filter the output first. This keeps the MCP server small
-enough for agents to inspect quickly:
-
-```bash
-apidiom generate mcp \
-  https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json \
-  --list
-
-apidiom generate mcp \
-  https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json \
-  --include GET:/repos/{owner}/{repo} \
-  --check \
-  --output github_repo_mcp.py
-```
-
-Generated excerpt:
-
-```python
-from mcp.server.fastmcp import FastMCP
-
-mcp = FastMCP("github_v3_rest_api")
-
-@mcp.tool()
-def repos_get(owner: str, repo: str) -> dict[str, Any]:
-    """Get a repository"""
-    path = f"/repos/{owner}/{repo}"
-    params: dict[str, Any] = {}
-    headers: dict[str, str] = {}
-    return _request_json(
-        "GET",
-        path,
-        params=params or None,
-        headers=headers or None,
-    )
-```
-
-For authenticated APIs, generated tools read credentials from environment
-variables. The generic API key scheme uses `APIDIOM_API_KEY`; named schemes use
-`APIDIOM_<SCHEME_NAME>_API_KEY`. `APIDIOM_API_BASE_URL` overrides the OpenAPI
-server URL.
-
-Stripe works the same way. Filter to the endpoint you need and run the syntax
-check before wiring it into an agent:
-
-```bash
-apidiom generate mcp \
-  https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json \
-  --include POST:/v1/payment_intents \
-  --check \
-  --output stripe_payments_mcp.py
-```
-
-`--check` compiles the generated server, counts exported MCP tools, and prints
-the environment variables the server may read. It does not call the live API.
-When `--output` writes a generated MCP server file, apidiom also writes a
-neighboring `README.md` with the run command, environment variables, and
-exported tool selectors.

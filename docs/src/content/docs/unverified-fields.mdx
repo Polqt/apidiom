@@ -1,30 +1,13 @@
 ---
 title: Unverified Fields
-description: How apidiom marks uncertain generated fields instead of guessing.
+description: Archived roadmap note for the old unstructured-doc extraction flow.
 ---
 
-`apidiom` is deliberately conservative. If the docs do not explicitly state a
-type, required flag, auth detail, server URL, schema property, or similar field,
-the tool does not guess.
+This page is archived. The current TypeScript CLI reads OpenAPI specs directly
+and does not run the old unstructured-doc extraction pipeline.
 
-Instead, it carries uncertainty forward:
+For current behavior, see:
 
-- OpenAPI fragments use `x-apidiom-unknown` markers.
-- Descriptions may include `UNVERIFIED` notes.
-- Generated fallback code includes `# UNVERIFIED:` comments where possible.
-- The CLI prints a summary after generation unless `--quiet` is set.
-- The web UI shows a visible warning banner.
-
-This is a feature, not just a warning. API docs often omit important details,
-and silent guesses create clients that look type-safe while hiding risk.
-`apidiom` keeps those gaps visible so you can review them before relying on the
-generated client.
-
-Example CLI summary:
-
-```text
-3 fields could not be verified from the docs:
-- $.paths./pets.get.parameters[0]: type
-- $.paths./pets.get.parameters[0]: required
-- $.servers: url
-```
+- [MCP Server](/mcp-server/)
+- [JSON Schema Export](/schema-export/)
+- [Troubleshooting](/troubleshooting/)

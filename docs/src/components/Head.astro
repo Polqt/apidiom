@@ -1,0 +1,94 @@
+---
+import DefaultHead from '@astrojs/starlight/components/Head.astro';
+---
+
+<DefaultHead />
+
+<script is:inline>
+  document.addEventListener('DOMContentLoaded', () => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const selectors = [
+      '.content-panel',
+      '.sidebar-content',
+      '.right-sidebar-panel',
+      '.expressive-code .frame',
+      '.pagination-links a',
+    ];
+    const targets = Array.from(document.querySelectorAll(selectors.join(',')));
+
+    if (!reduceMotion && 'IntersectionObserver' in window) {
+      document.documentElement.classList.add('has-scroll-reveal');
+      for (const target of targets) target.classList.add('scroll-reveal');
+
+      const observer = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          entry.target.classList.add('is-visible');
+          observer.unobserve(entry.target);
+        }
+      }, {
+        rootMargin: '0px 0px -12% 0px',
+        threshold: 0.14,
+      });
+
+      for (const target of targets) observer.observe(target);
+    } else {
+      for (const target of targets) target.classList.add('is-visible');
+    }
+
+    const tocLinks = Array.from(document.querySelectorAll('starlight-toc a[href^="#"], mobile-starlight-toc a[href^="#"]'));
+    const headings = tocLinks
+      .map((link) => {
+        const href = link.getAttribute('href');
+        if (!href) return null;
+        const id = decodeURIComponent(href.slice(1));
+        const heading = document.getElementById(id);
+        return heading ? { id, heading } : null;
+      })
+      .filter(Boolean);
+
+    if (tocLinks.length && headings.length && 'IntersectionObserver' in window) {
+      const setCurrent = (id) => {
+        for (const link of tocLinks) {
+          const href = link.getAttribute('href') || '';
+          const isCurrent = decodeURIComponent(href.slice(1)) === id;
+          if (isCurrent) link.setAttribute('aria-current', 'true');
+          else link.removeAttribute('aria-current');
+        }
+      };
+
+      const visible = new Set();
+      const headingObserver = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          const id = entry.target.id;
+          if (entry.isIntersecting) visible.add(id);
+          else visible.delete(id);
+        }
+
+        let current = null;
+        for (const item of headings) {
+          if (visible.has(item.id)) current = item;
+        }
+        if (current) setCurrent(current.id);
+      }, {
+        rootMargin: '-18% 0px -58% 0px',
+        threshold: 0,
+      });
+
+      for (const { heading } of headings) headingObserver.observe(heading);
+
+      const bottomTarget = document.querySelector('.pagination-links, main footer, footer');
+      if (bottomTarget) {
+        const bottomObserver = new IntersectionObserver((entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            setCurrent(headings[headings.length - 1].id);
+          }
+        }, {
+          rootMargin: '0px 0px -8% 0px',
+          threshold: 0.01,
+        });
+        bottomObserver.observe(bottomTarget);
+      }
+    }
+  });
+</script>

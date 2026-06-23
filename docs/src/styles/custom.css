@@ -554,6 +554,10 @@ starlight-toc li {
   padding: 0 !important;
 }
 
+starlight-toc li + li {
+  margin-top: 0.42rem !important;
+}
+
 starlight-toc a {
   display: block;
   color: var(--sl-color-gray-2) !important;
@@ -646,4 +650,130 @@ header nav a:not(.site-title) {
 .social-icons a:hover,
 header nav a:not(.site-title):hover {
   color: var(--sl-color-gray-1) !important;
+}
+
+@keyframes docRiseIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes docLineSweep {
+  0%, 42% {
+    transform: translateX(-110%);
+    opacity: 0;
+  }
+  54% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+}
+
+@keyframes docCaretPulse {
+  0%, 100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .has-scroll-reveal .scroll-reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+      opacity 620ms cubic-bezier(0.16, 1, 0.3, 1),
+      transform 620ms cubic-bezier(0.16, 1, 0.3, 1),
+      border-color 240ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: opacity, transform;
+  }
+
+  .has-scroll-reveal .scroll-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    will-change: auto;
+  }
+
+  .has-scroll-reveal .content-panel + .content-panel.scroll-reveal {
+    transition-delay: 90ms;
+  }
+
+  .expressive-code .frame {
+    position: relative;
+    overflow: hidden;
+    transform: translateY(0);
+    transition:
+      transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
+      border-color 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .expressive-code .frame:hover {
+    transform: translateY(-2px);
+    border-color: var(--sl-color-gray-4) !important;
+  }
+
+  .expressive-code .frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, transparent, rgba(255,255,255,0.06), transparent);
+    transform: translateX(-110%);
+    animation: docLineSweep 8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+    pointer-events: none;
+  }
+
+  h1#_top::before,
+  h1[data-page-title]::before,
+  .site-title::before {
+    animation: docCaretPulse 2.4s ease-in-out infinite;
+  }
+}
+
+.sidebar-content a,
+starlight-toc a,
+.pagination-links a,
+.sl-markdown-content a {
+  transition:
+    color 140ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 140ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 140ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.sidebar-content a:hover,
+starlight-toc a:hover,
+.pagination-links a:hover {
+  transform: translateX(2px);
+}
+
+.pagination-links a:active,
+.sidebar-content a:active {
+  transform: translate(2px, 1px);
+}
+
+.sl-markdown-content a:not(.sl-anchor-link) {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+}
+
+.sl-markdown-content a:not(.sl-anchor-link):hover {
+  color: var(--sl-color-white);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

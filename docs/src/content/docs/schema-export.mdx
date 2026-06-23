@@ -1,0 +1,61 @@
+---
+title: JSON Schema Export
+description: Export OpenAI or Anthropic tool schemas from OpenAPI specs.
+---
+
+`apidiom generate schema` writes portable tool schema JSON for raw SDK use.
+The command requires an explicit `--format` so OpenAI and Anthropic output are
+not confused.
+
+```bash
+apidiom generate schema ./openapi.yaml --format openai --output tools.json
+apidiom generate schema ./openapi.yaml --format anthropic
+```
+
+## OpenAI Format
+
+```json
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "list_pets",
+      "description": "List pets",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": { "type": "integer" }
+        }
+      }
+    }
+  }
+]
+```
+
+## Anthropic Format
+
+```json
+[
+  {
+    "name": "list_pets",
+    "description": "List pets",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": { "type": "integer" }
+      }
+    }
+  }
+]
+```
+
+## Filtering
+
+Schema export uses the same tool naming and filtering helpers as MCP generation.
+
+```bash
+apidiom generate schema stripe --format openai --tag PaymentIntents
+apidiom generate schema ./openapi.yaml --format anthropic --include listPets
+```
+
+Only tool input schemas are exported. Auth and HTTP execution stay in your app.
