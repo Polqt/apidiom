@@ -1,10 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import path from "path";
 import yaml from "js-yaml";
 import fs from "fs";
 import { parseOpenAPI } from "../../ts/ingest/parse";
 import { extractAuth } from "../../ts/auth";
 import { generateMCPServer, normalizeToolName, enrichDescription } from "../../ts/generate/mcp";
+import type { APIModel } from "../../ts/model";
 
 const FIXTURE_PATH = path.resolve(__dirname, "../fixtures/petstore.yaml");
 const doc = yaml.load(fs.readFileSync(FIXTURE_PATH, "utf-8")) as Record<string, unknown>;
@@ -150,6 +151,7 @@ describe("enrichDescription", () => {
 
 describe("generateMCPServer — deduplication", () => {
   it("renames colliding normalized tool names with _2 suffix", () => {
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const collidingModel: import("../../ts/model").APIModel = {
       title: "Test API",
       version: "1.0",
@@ -175,6 +177,8 @@ describe("generateMCPServer — deduplication", () => {
     const output = generateMCPServer(collidingModel, []);
     expect(output).toContain('"get_pets"');
     expect(output).toContain('"get_pets_2"');
+    expect(stderr).toHaveBeenCalledWith(expect.stringContaining('renamed to "get_pets_2"'));
+    stderr.mockRestore();
   });
 
   it("generates no triple blank lines when no auth schemes present", () => {
@@ -187,5 +191,87 @@ describe("generateMCPServer — deduplication", () => {
     };
     const output = generateMCPServer(model, []);
     expect(output).not.toMatch(/\n\n\n/);
+  });
+});
+
+describe("generateMCPServer — search mode", () => {
+  it("search mode: tools/list returns exactly 2 meta-tools", () => {
+    const model: APIModel = {
+      title: "Test API",
+      version: "1.0.0",
+      serverUrl: "https://api.test.com",
+      endpoints: [
+        { path: "/a", method: "GET", operationId: "getA", tags: [], parameters: [] },
+        { path: "/b", method: "GET", operationId: "getB", tags: [], parameters: [] },
+      ],
+      authSchemes: [],
+    };
+    const output = generateMCPServer(model, [], { mode: "search" });
+    expect(output).toContain('"search_tools"');
+    expect(output).toContain('"call_tool"');
+    expect(output).not.toContain("_TOOLS.map(function(t)");
+  });
+
+  it("search mode: output contains scorer logic", () => {
+    const model: APIModel = {
+      title: "Test API",
+      version: "1.0.0",
+      serverUrl: "https://api.test.com",
+      endpoints: [
+        { path: "/a", method: "GET", operationId: "getA", tags: [], parameters: [] },
+      ],
+      authSchemes: [],
+    };
+    const output = generateMCPServer(model, [], { mode: "search" });
+    expect(output).toContain("total_matched");
+    expect(output).toContain("_scoreTools");
+  });
+
+  it("flat mode: tools/list still returns all tools (unchanged)", () => {
+    const model: APIModel = {
+      title: "Test API",
+      version: "1.0.0",
+      serverUrl: "https://api.test.com",
+      endpoints: [
+        { path: "/a", method: "GET", operationId: "getA", tags: [], parameters: [] },
+      ],
+      authSchemes: [],
+    };
+    const output = generateMCPServer(model, [], { mode: "flat" });
+    expect(output).toContain("_TOOLS.map(function(t)");
+  });
+
+  it("search mode: generated JS contains _tags on tools and scorer structure", () => {
+    const model: APIModel = {
+      title: "Test API",
+      version: "1.0.0",
+      serverUrl: "https://api.test.com",
+      endpoints: [
+        { path: "/customers", method: "POST", operationId: "createCustomer", tags: ["customers"], parameters: [] },
+        { path: "/customers/{id}", method: "GET", operationId: "getCustomer", tags: ["customers"], parameters: [] },
+        { path: "/charges", method: "POST", operationId: "createCharge", tags: ["charges"], parameters: [] },
+      ],
+      authSchemes: [],
+    };
+    const output = generateMCPServer(model, [], { mode: "search" });
+
+    // Meta-tools present
+    expect(output).toContain("search_tools");
+    expect(output).toContain("call_tool");
+    expect(output).toContain("total_matched");
+    expect(output).toContain("_scoreTools");
+
+    // _tags baked into _TOOLS for scorer; search mode must have scorer referencing them
+    expect(output).toContain("_tags:");
+    expect(output).toContain('"customers"');
+    expect(output).toContain('"charges"');
+    expect(output).toContain("_TOOLS[i]._tags");
+
+    // K=5 cap in search_tools handler
+    expect(output).toContain("slice(0, 5)");
+
+    // Permissive dispatch: call_tool unwraps name + arguments
+    expect(output).toContain("args.name");
+    expect(output).toContain("args.arguments");
   });
 });

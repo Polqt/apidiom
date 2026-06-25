@@ -7,6 +7,7 @@ export interface MCPGenOptions {
   tags?: string[];
   include?: string[];
   groupByTag?: boolean;
+  mode?: "flat" | "search";
 }
 
 export function generateMCPServer(
@@ -36,7 +37,9 @@ export function generateMCPServer(
     generateAuthSection(auth),
     generateRequestHelper(),
     generateToolsArray(tools, model.serverUrl, auth),
-    generateMCPHandler(serverName, model.version),
+    opts.mode === "search"
+      ? generateSearchHandler(serverName, model.version)
+      : generateMCPHandler(serverName, model.version),
   ];
 
   return parts.filter((s) => s !== null && s !== undefined).join("\n");
@@ -125,6 +128,7 @@ function generateTool(tool: ToolMetadata, serverUrl: string, auth: AuthConfig[])
     name: ${JSON.stringify(tool.name)},
     description: ${JSON.stringify(tool.description)},
     inputSchema: ${JSON.stringify(tool.inputSchema)},
+    _tags: ${JSON.stringify(ep.tags)},
     call: function(args) {
       ${queryLines.join("\n")}
       return _request(${JSON.stringify(ep.method)}, ${urlExpr}, ${authHeadersStr}, ${bodyArg});
@@ -217,6 +221,124 @@ function generateMCPHandler(serverName: string, version: string): string {
         return Promise.resolve();
       }
       return Promise.resolve(tool.call((params && params.arguments) || {})).then(function(result) {
+        _send({ jsonrpc: "2.0", id: id, result: { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] } });
+      }).catch(function(e) {
+        _send({ jsonrpc: "2.0", id: id, result: { content: [{ type: "text", text: "Error: " + (e instanceof Error ? e.message : String(e)) }], isError: true } });
+      });
+    } else if (id !== undefined) {
+      _send({ jsonrpc: "2.0", id: id, error: { code: -32601, message: "Method not found: " + method } });
+      return Promise.resolve();
+    }
+    return Promise.resolve();
+  }`;
+}
+
+function generateSearchHandler(serverName: string, version: string): string {
+  return `// --- Search scorer (inlined) ---
+  function _tokenize(text) {
+    return text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(/\\s+/).filter(Boolean);
+  }
+  function _scoreTools(query) {
+    var qt = _tokenize(query);
+    if (!qt.length) return [];
+    var scored = [];
+    for (var i = 0; i < _TOOLS.length; i++) {
+      var tool = _TOOLS[i];
+      var nameTokens = _tokenize(tool.name);
+      var descTokens = _tokenize(tool.description);
+      var tagTokens = [].concat.apply([], (_TOOLS[i]._tags || []).map(_tokenize));
+      var score = 0; var covered = 0;
+      for (var j = 0; j < qt.length; j++) {
+        var q = qt[j]; var ts = 0;
+        if (nameTokens.indexOf(q) !== -1) ts += 10;
+        else if (tool.name.toLowerCase().indexOf(q) !== -1) ts += 5;
+        if (descTokens.indexOf(q) !== -1) ts += 2;
+        else if (tool.description.toLowerCase().indexOf(q) !== -1) ts += 1;
+        if (tagTokens.indexOf(q) !== -1) ts += 3;
+        if (ts > 0) covered++;
+        score += ts;
+      }
+      if (score > 0) {
+        scored.push({ tool: tool, score: score * (0.5 + 0.5 * covered / qt.length) });
+      }
+    }
+    return scored.sort(function(a, b) { return b.score - a.score; });
+  }
+
+// --- MCP Protocol (search mode) ---
+  var _buf = "";
+  process.stdin.setEncoding("utf8");
+  function _processLine(line) {
+    if (!line.trim()) return;
+    var msg;
+    try { msg = JSON.parse(line); } catch(e) { return; }
+    _handle(msg).catch(function(e) { process.stderr.write((e instanceof Error ? e.message : String(e)) + "\\n"); });
+  }
+  process.stdin.on("data", function(chunk) {
+    _buf += chunk;
+    var lines = _buf.split("\\n");
+    _buf = lines.pop() || "";
+    for (var i = 0; i < lines.length; i++) { _processLine(lines[i]); }
+  });
+  process.stdin.on("end", function() {
+    if (_buf.trim()) _processLine(_buf);
+  });
+
+  function _send(obj) { process.stdout.write(JSON.stringify(obj) + "\\n"); }
+
+  var _META_TOOLS = [
+    {
+      name: "search_tools",
+      description: "Search available API tools by keyword. Returns up to 5 matching tools with full schemas. Use this before calling any tool.",
+      inputSchema: { type: "object", properties: { query: { type: "string", description: "Keywords describing the operation (e.g. 'create customer', 'list payments')" } }, required: ["query"] }
+    },
+    {
+      name: "call_tool",
+      description: "Call a specific API tool by name with arguments. Use search_tools first to find the tool name and required arguments.",
+      inputSchema: { type: "object", properties: { name: { type: "string", description: "Tool name from search_tools results" }, arguments: { type: "object", description: "Tool arguments matching the tool's inputSchema" } }, required: ["name"] }
+    }
+  ];
+
+  function _handle(msg) {
+    var id = msg.id;
+    var method = msg.method;
+    var params = msg.params;
+    if (method === "initialize") {
+      _send({ jsonrpc: "2.0", id: id, result: { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: ${JSON.stringify(serverName)}, version: ${JSON.stringify(version)} } } });
+      return Promise.resolve();
+    } else if (method === "notifications/initialized") {
+      return Promise.resolve();
+    } else if (method === "tools/list") {
+      _send({ jsonrpc: "2.0", id: id, result: { tools: _META_TOOLS } });
+      return Promise.resolve();
+    } else if (method === "tools/call") {
+      var toolName = params && params.name;
+      var args = (params && params.arguments) || {};
+      if (toolName === "search_tools") {
+        var query = args.query || "";
+        var scored = _scoreTools(query);
+        var top = scored.slice(0, 5);
+        var result = {
+          matches: top.map(function(s) { return { name: s.tool.name, description: s.tool.description, inputSchema: s.tool.inputSchema }; }),
+          total_matched: scored.length
+        };
+        if (scored.length > 5) result.hint = "Refine your query to narrow results (" + scored.length + " matched).";
+        _send({ jsonrpc: "2.0", id: id, result: { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] } });
+        return Promise.resolve();
+      }
+      if (toolName === "call_tool") {
+        toolName = args.name;
+        args = args.arguments || {};
+      }
+      var tool = null;
+      for (var i = 0; i < _TOOLS.length; i++) {
+        if (_TOOLS[i].name === toolName) { tool = _TOOLS[i]; break; }
+      }
+      if (!tool) {
+        _send({ jsonrpc: "2.0", id: id, error: { code: -32601, message: "Unknown tool: " + toolName } });
+        return Promise.resolve();
+      }
+      return Promise.resolve(tool.call(args)).then(function(result) {
         _send({ jsonrpc: "2.0", id: id, result: { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] } });
       }).catch(function(e) {
         _send({ jsonrpc: "2.0", id: id, result: { content: [{ type: "text", text: "Error: " + (e instanceof Error ? e.message : String(e)) }], isError: true } });

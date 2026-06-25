@@ -1,4 +1,4 @@
----
+﻿---
 title: MCP Server
 description: Generate standalone JavaScript MCP servers from OpenAPI specs.
 ---
@@ -36,6 +36,42 @@ apidiom generate mcp ./openapi.yaml --include listPets --output pets-mcp.js
 
 `--tag` matches OpenAPI operation tags. `--include` matches operation IDs.
 
+## Search Mode
+
+APIs with many operations (Stripe has 590+) can flood an agent's context window
+with tool schemas, often over 200K tokens, making the server unusable.
+
+When selected operations exceed the flat-tool threshold, apidiom automatically
+switches to search mode. You can also request it explicitly:
+
+```bash
+apidiom generate mcp stripe --mode search --output stripe-mcp.js
+```
+
+The generated server exposes two meta-tools:
+
+- **`search_tools`** - search by keyword, returns up to 5 matching tools with full schemas
+- **`call_tool`** - call any tool by name
+
+```
+Agent: search_tools(query: "create customer")
+-> { matches: [{name: "create_customer", inputSchema: {...}}, ...], total_matched: 12 }
+
+Agent: call_tool(name: "create_customer", arguments: {email: "x@y.com"})
+-> { id: "cus_..." }
+```
+
+All tool definitions are baked into the generated file at build time. `--mode search`
+only changes what `tools/list` advertises. The agent discovers tools on demand instead
+of receiving all schemas upfront.
+
+By default, `generate mcp` switches to search mode above 40 selected tools
+(~15K tokens in `tools/list`). To force a flat server, choose flat mode and raise
+the guard high enough for the selected tool count:
+
+```bash
+apidiom generate mcp stripe --mode flat --max-tools 100 --tag charges --output stripe-charges-mcp.js
+```
 ## Generated Shape
 
 Generated MCP servers are plain CommonJS files. They include a `_TOOLS` registry

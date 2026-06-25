@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import path from "path";
-import { execSync, spawn } from "child_process";
+import { execSync, spawn, spawnSync } from "child_process";
 import fs from "fs";
 import fsp from "fs/promises";
 import http from "http";
@@ -9,53 +9,65 @@ import type { AddressInfo } from "net";
 
 const CLI = path.resolve(__dirname, "../dist/cli.js");
 const FIXTURE = path.resolve(__dirname, "fixtures/petstore.yaml");
+const ROOT = path.resolve(__dirname, "..");
+
+function runCli(args: string[]) {
+  return spawnSync(process.execPath, [CLI, ...args], {
+    cwd: ROOT,
+    encoding: "utf-8",
+  });
+}
+
+function expectCliOk(args: string[]): string {
+  const result = runCli(args);
+  expect(result.status).toBe(0);
+  expect(result.stderr).toBe("");
+  return result.stdout;
+}
 
 // Build first — tests depend on dist/cli.js
 try {
-  execSync("npm run build", { stdio: "pipe", cwd: path.resolve(__dirname, "..") });
+  execSync("npm run build", { stdio: "pipe", cwd: ROOT });
 } catch (e) {
   throw new Error(`Build failed before CLI tests: ${e}`);
 }
 
 describe("CLI integration", () => {
   it("--help shows usage", () => {
-    const out = execSync(`node "${CLI}" --help`).toString();
+    const out = expectCliOk(["--help"]);
     expect(out).toContain("apidiom");
     expect(out).toContain("generate");
   });
 
   it("generate mcp --list shows known services", () => {
-    const out = execSync(`node "${CLI}" generate mcp --list`).toString();
+    const out = expectCliOk(["generate", "mcp", "--list"]);
     expect(out).toContain("stripe");
     expect(out).toContain("github");
   });
 
   it("generate mcp <fixture> outputs valid JS", () => {
-    const out = execSync(`node "${CLI}" generate mcp "${FIXTURE}"`).toString();
+    const out = expectCliOk(["generate", "mcp", FIXTURE]);
     expect(out).toContain("list_pets");
     expect(out).toContain("tools/list");
     expect(out).toContain("tools/call");
   });
 
   it("generate mcp accepts bare relative file paths", () => {
-    const out = execSync(
-      `node "${CLI}" generate mcp ts-tests/fixtures/petstore.yaml`
-    ).toString();
+    const out = expectCliOk(["generate", "mcp", "ts-tests/fixtures/petstore.yaml"]);
     expect(out).toContain("list_pets");
   });
 
   it("generate mcp <fixture> --output writes file", () => {
     const outFile = path.resolve(__dirname, "petstore-mcp.js");
-    execSync(`node "${CLI}" generate mcp "${FIXTURE}" --output "${outFile}"`);
-    const fs = require("fs");
+    const result = runCli(["generate", "mcp", FIXTURE, "--output", outFile]);
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain(`Written to ${outFile}`);
     expect(fs.existsSync(outFile)).toBe(true);
     fs.unlinkSync(outFile);
   });
 
   it("generate schema prints Anthropic JSON", () => {
-    const out = execSync(
-      `node "${CLI}" generate schema "${FIXTURE}" --format anthropic`
-    ).toString();
+    const out = expectCliOk(["generate", "schema", FIXTURE, "--format", "anthropic"]);
     const tools = JSON.parse(out);
     expect(tools[0].name).toBe("list_pets");
     expect(tools[0].input_schema.type).toBe("object");
@@ -63,9 +75,9 @@ describe("CLI integration", () => {
 
   it("generate schema --output writes OpenAI JSON", () => {
     const outFile = path.resolve(__dirname, "petstore-tools.json");
-    execSync(
-      `node "${CLI}" generate schema "${FIXTURE}" --format openai --output "${outFile}"`
-    );
+    const result = runCli(["generate", "schema", FIXTURE, "--format", "openai", "--output", outFile]);
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain(`Written to ${outFile}`);
     const tools = JSON.parse(fs.readFileSync(outFile, "utf8"));
     expect(tools[0].type).toBe("function");
     expect(tools[0].function.name).toBe("list_pets");
@@ -73,17 +85,15 @@ describe("CLI integration", () => {
   });
 
   it("generate schema requires --format", () => {
-    let threw = false;
-    try { execSync(`node "${CLI}" generate schema "${FIXTURE}"`); }
-    catch { threw = true; }
-    expect(threw).toBe(true);
+    const result = runCli(["generate", "schema", FIXTURE]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("required option '--format <format>' not specified");
   });
 
   it("generate mcp unknown-service exits 1", () => {
-    let threw = false;
-    try { execSync(`node "${CLI}" generate mcp totally-unknown-svc-xyz`); }
-    catch { threw = true; }
-    expect(threw).toBe(true);
+    const result = runCli(["generate", "mcp", "totally-unknown-svc-xyz"]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Unknown service "totally-unknown-svc-xyz"');
   });
 
   it("generated MCP server lists and calls tools against a local API", async () => {
@@ -119,7 +129,8 @@ describe("CLI integration", () => {
         const specPath = path.join(tempDir, "book-api.yaml");
         const outputPath = path.join(tempDir, "book-api-mcp.js");
         fs.writeFileSync(specPath, bookApiSpec(port), "utf8");
-        execSync(`node "${CLI}" generate mcp "${specPath}" --output "${outputPath}"`);
+        const generateResult = runCli(["generate", "mcp", specPath, "--output", outputPath]);
+        expect(generateResult.status).toBe(0);
 
         const child = spawn(process.execPath, [outputPath], {
           stdio: ["pipe", "pipe", "pipe"],
@@ -197,7 +208,7 @@ describe("CLI integration", () => {
 
   it("reports version from package.json", () => {
     const pkg = require("../package.json") as { version: string };
-    const output = execSync(`node "${CLI}" --version`, { cwd: path.resolve(__dirname, "..") }).toString().trim();
+    const output = expectCliOk(["--version"]).trim();
     expect(output).toBe(pkg.version);
   });
 
@@ -210,6 +221,65 @@ describe("CLI integration", () => {
     expect(formatCheckIdx).toBeGreaterThan(-1);
     expect(fetchIdx).toBeGreaterThan(-1);
     expect(formatCheckIdx).toBeLessThan(fetchIdx);
+  });
+
+  it("generate mcp auto-switches to search mode when tool count exceeds --max-tools", () => {
+    const result = spawnSync(
+      process.execPath,
+      [CLI, "generate", "mcp", FIXTURE, "--max-tools", "1"],
+      { cwd: ROOT, encoding: "utf-8" }
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain("switching to --mode search");
+    expect(result.stdout).toContain("search_tools");
+    expect(result.stdout).toContain("call_tool");
+    expect(result.stdout).not.toContain("_TOOLS.map(function(t)");
+  });
+
+  it("generate mcp --mode auto behaves like default auto mode", () => {
+    const result = spawnSync(
+      process.execPath,
+      [CLI, "generate", "mcp", FIXTURE, "--mode", "auto", "--max-tools", "1"],
+      { cwd: ROOT, encoding: "utf-8" }
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain("switching to --mode search");
+    expect(result.stdout).toContain("search_tools");
+    expect(result.stdout).toContain("call_tool");
+  });
+
+  it("generate mcp --mode flat still errors when explicit flat output exceeds --max-tools", () => {
+    const result = spawnSync(
+      process.execPath,
+      [CLI, "generate", "mcp", FIXTURE, "--mode", "flat", "--max-tools", "1"],
+      { cwd: ROOT, encoding: "utf-8" }
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("tokens in tools/list");
+    expect(result.stderr).toContain("--mode search");
+  });
+
+  it("generate schema warns when tool count exceeds --max-tools but still prints JSON", () => {
+    const result = spawnSync(
+      process.execPath,
+      [CLI, "generate", "schema", FIXTURE, "--format", "anthropic", "--max-tools", "1"],
+      { cwd: ROOT, encoding: "utf-8" }
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain("Warning: 3 tool schemas generated");
+    const tools = JSON.parse(result.stdout);
+    expect(tools).toHaveLength(3);
+  });
+
+  it("generate mcp --mode search generates 2 meta-tools not flat list", () => {
+    const output = expectCliOk(["generate", "mcp", FIXTURE, "--mode", "search"]);
+    expect(output).toContain("search_tools");
+    expect(output).toContain("call_tool");
+    expect(output).not.toContain("_TOOLS.map(function(t)");
   });
 });
 
