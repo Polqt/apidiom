@@ -101,7 +101,7 @@ describe("CLI integration", () => {
       const server = http.createServer((req, res) => {
         res.setHeader("content-type", "application/json");
         if (req.method === "GET" && req.url?.startsWith("/books?")) {
-          res.end(JSON.stringify({ route: "list", url: req.url }));
+          res.end(JSON.stringify({ route: "list", url: req.url, traceId: req.headers["x-trace-id"] }));
           return;
         }
         if (req.method === "GET" && req.url === "/books/b1") {
@@ -144,7 +144,7 @@ describe("CLI integration", () => {
 
         child.stdout.on("data", (chunk) => {
           stdout += chunk.toString();
-          if (stdout.includes('"id":5')) {
+          if (stdout.includes('"id":6')) {
             child.kill();
           }
         });
@@ -161,7 +161,11 @@ describe("CLI integration", () => {
             expect(stdout).toContain('"name":"list_books"');
             expect(stdout).toContain('"name":"create_book"');
             expect(stdout).toContain('"name":"get_book"');
+            expect(stdout).toContain('"id":6');
+            expect(stdout).toContain('"isError":true');
+            expect(stdout).toContain("HTTP 404");
             expect(stdout).toContain('\\"route\\": \\"list\\"');
+            expect(stdout).toContain('\\"traceId\\": \\"trace-1\\"');
             expect(stdout).toContain('\\"id\\": \\"b1\\"');
             expect(stdout).toContain('\\"created\\": {');
             resolve();
@@ -182,7 +186,7 @@ describe("CLI integration", () => {
               jsonrpc: "2.0",
               id: 3,
               method: "tools/call",
-              params: { name: "list_books", arguments: { limit: 1 } },
+              params: { name: "list_books", arguments: { limit: 1, "X-Trace-Id": "trace-1" } },
             }),
             JSON.stringify({
               jsonrpc: "2.0",
@@ -197,6 +201,99 @@ describe("CLI integration", () => {
               params: {
                 name: "create_book",
                 arguments: { body: { title: "New", pages: 99 } },
+              },
+            }),
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: 6,
+              method: "tools/call",
+              params: { name: "get_book", arguments: { bookId: "missing" } },
+            }),
+            "",
+          ].join("\n")
+        );
+      });
+    });
+  }, 10000);
+
+  it("generated search-mode MCP server searches and calls tools against a local API", async () => {
+    await new Promise<void>((resolve, reject) => {
+      const server = http.createServer((req, res) => {
+        res.setHeader("content-type", "application/json");
+        if (req.method === "GET" && req.url === "/books/b1") {
+          res.end(JSON.stringify({ id: "b1", title: "Agent Tools" }));
+          return;
+        }
+        res.statusCode = 404;
+        res.end(JSON.stringify({ error: "not found" }));
+      });
+
+      server.listen(0, "127.0.0.1", () => {
+        const { port } = server.address() as AddressInfo;
+        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "apidiom-search-smoke-"));
+        const specPath = path.join(tempDir, "book-api.yaml");
+        const outputPath = path.join(tempDir, "book-api-mcp.js");
+        fs.writeFileSync(specPath, bookApiSpec(port), "utf8");
+        const generateResult = runCli(["generate", "mcp", specPath, "--mode", "search", "--output", outputPath]);
+        expect(generateResult.status).toBe(0);
+
+        const child = spawn(process.execPath, [outputPath], {
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+        let stdout = "";
+        let stderr = "";
+        const timer = setTimeout(() => {
+          child.kill();
+          reject(new Error("generated search-mode MCP smoke test timed out"));
+        }, 5000);
+
+        child.stdout.on("data", (chunk) => {
+          stdout += chunk.toString();
+          if (stdout.includes('"id":5')) {
+            child.kill();
+          }
+        });
+        child.stderr.on("data", (chunk) => {
+          stderr += chunk.toString();
+        });
+        child.on("error", reject);
+        child.on("close", () => {
+          clearTimeout(timer);
+          server.close();
+          fs.rmSync(tempDir, { recursive: true, force: true });
+          try {
+            expect(stderr).toBe("");
+            expect(stdout).toContain('"name":"search_tools"');
+            expect(stdout).toContain('"name":"call_tool"');
+            expect(stdout).toContain('\\"name\\": \\"get_book\\"');
+            expect(stdout).toContain('\\"id\\": \\"b1\\"');
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        });
+
+        child.stdin.end(
+          [
+            JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize" }),
+            JSON.stringify({
+              jsonrpc: "2.0",
+              method: "notifications/initialized",
+            }),
+            JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }),
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: 3,
+              method: "tools/call",
+              params: { name: "search_tools", arguments: { query: "get book" } },
+            }),
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: 5,
+              method: "tools/call",
+              params: {
+                name: "call_tool",
+                arguments: { name: "get_book", arguments: { bookId: "b1" } },
               },
             }),
             "",
@@ -250,6 +347,12 @@ describe("CLI integration", () => {
     expect(result.stdout).toContain("call_tool");
   });
 
+  it("generate mcp rejects non-integer --max-tools values", () => {
+    const result = runCli(["generate", "mcp", FIXTURE, "--max-tools", "1abc"]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("--max-tools must be a positive integer");
+  });
+
   it("generate mcp --mode flat still errors when explicit flat output exceeds --max-tools", () => {
     const result = spawnSync(
       process.execPath,
@@ -273,6 +376,12 @@ describe("CLI integration", () => {
     expect(result.stderr).toContain("Warning: 3 tool schemas generated");
     const tools = JSON.parse(result.stdout);
     expect(tools).toHaveLength(3);
+  });
+
+  it("generate schema rejects decimal --max-tools values", () => {
+    const result = runCli(["generate", "schema", FIXTURE, "--format", "anthropic", "--max-tools", "1.5"]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("--max-tools must be a positive integer");
   });
 
   it("generate mcp --mode search generates 2 meta-tools not flat list", () => {
@@ -301,6 +410,11 @@ paths:
           required: false
           schema:
             type: integer
+        - name: X-Trace-Id
+          in: header
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: OK

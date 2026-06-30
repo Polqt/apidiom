@@ -25,7 +25,7 @@ export interface APIEndpoint {
   requestBody?: RequestBody;
 }
 
-export type AuthType = "apiKey" | "http" | "oauth2" | "openIdConnect";
+type AuthType = "apiKey" | "http" | "oauth2" | "openIdConnect";
 
 export interface AuthScheme {
   name: string;

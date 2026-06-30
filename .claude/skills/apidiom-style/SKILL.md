@@ -7,84 +7,62 @@ description: Use when writing any code for the apidiom project — enforces proj
 
 ## Project Shape
 
-**Thin CLI, fat library.** Real logic lives in importable modules. CLI (`cli.py`) and web (`web/`) are thin wrappers only.
+**Thin CLI, fat library.** Real logic lives in importable TypeScript modules under `ts/`. CLI (`ts/cli.ts`) is a thin Commander wrapper only.
 
 ```
-src/apidiom/
-  ingest/          ← parse inputs → models
-  generate/        ← models → code (Jinja2 templates)
-    templates/     ← *.j2 files, one per output format
-  mcp/             ← apidiom's own MCP server (thin)
-  llm/             ← provider abstraction + pydantic-ai adapter
-  output/          ← write_output(), clipboard, file I/O
-  pipeline.py      ← orchestration: ingest → generate → return
-  cli.py           ← click commands (thin)
-  config.py        ← env var reads only
-  models.py        ← frozen Pydantic models (source of truth)
+ts/
+  cli.ts             ← thin Commander CLI; calls library modules
+  model.ts           ← shared types (APIModel, APIEndpoint, AuthConfig …)
+  auth.ts            ← extractAuth()
+  registry.ts        ← REGISTRY, resolveSource()
+  registry.json      ← built-in service entries
+  ingest/
+    fetch.ts         ← fetchSpec() — HTTP + local file load + ref resolution
+    parse.ts         ← parseOpenAPI() — doc → APIModel
+    resolve.ts       ← resolveRefs() — shallow $ref resolution
+  generate/
+    mcp.ts           ← generateMCPServer() → standalone CJS JS string
+    schema.ts        ← generateToolSchema() → Anthropic/OpenAI JSON
+    tools.ts         ← buildToolMetadata(), normalizeToolName(), enrichDescription()
+    search.ts        ← scoreTools() — TypeScript scorer (mirrors generated JS scorer)
+
+ts-tests/            ← Vitest tests; mirror ts/ directory structure
+  fixtures/
+    petstore.yaml
+  cli.test.ts        ← CLI integration tests (spawn dist/cli.js)
+  auth.test.ts
+  registry.test.ts
+  ingest/
+    fetch.test.ts
+    parse.test.ts
+  generate/
+    mcp.test.ts
+    schema.test.ts
+    search.test.ts
 ```
 
-## Rules
+## Language & Toolchain
 
-**Models:** All domain types in `models.py`. Frozen Pydantic. No mutation.
+- TypeScript 5, strict mode, CommonJS output via tsup
+- `npm run build` → `dist/cli.js`
+- `npm run typecheck` → `tsc --noEmit`
+- `npm test` → `vitest run`
+- `npm run pack:smoke` → pack + run packed binary with `--version` to validate
 
-**Code generation:** Jinja2 template in `generate/templates/*.j2`. Generator function takes `APIClientModel`, returns `str`. Never build code strings with concatenation.
+## Key Conventions
 
-**Tests first.** AGENTS.md requires it. Write `tests/test_<module>.py` before implementation.
+- **Generated code is plain CJS JS** — no TypeScript, no frameworks, no bundler deps. Self-contained single file.
+- **No `any`, no `@ts-ignore`**. Cast through `Doc = Record<string, unknown>` at ingest boundaries only.
+- **No new dependencies** without a strong reason — current runtime deps are just `commander` and `js-yaml`.
+- **`resolveRefs` is shallow** — resolves `$ref` at the parameter/requestBody level only. Does NOT recurse into schemas (avoids OOM on Stripe-scale specs).
+- **Generated `_request` must treat non-2xx as rejection** — 3xx, 4xx, 5xx all reject with `Error("HTTP <status>: ...")`. Response stream errors also reject.
+- **`filterEndpoints` applies tags AND include as intersection** — an endpoint must satisfy both filters when both are provided.
+- **Tool names normalized via `normalizeToolName`**: camelCase → snake_case, version segments stripped (V1, V2).
 
-**No mocking of library internals.** Monkeypatch at module-level imports (`monkeypatch.setattr(server.pipeline, ...)`) not deep call chains.
+## Testing Rules
 
-**No new dependencies** without adding to `pyproject.toml` optional group AND `all` AND `dev`.
-
-**Errors:** Raise specific exception classes (e.g., `OpenAPIIngestError`, `CodegenError`, `MCPToolError`). Never `Exception` directly. CLI catches and calls `_fail()`.
-
-## Toolchain
-
-```bash
-ruff check src tests   # lint (E, F, I, UP, B rules)
-ruff format src tests  # format (88 chars, py311)
-mypy                   # strict — no Any escapes without cast()
-pytest                 # tests/
-```
-
-**All four must pass** before a change is complete.
-
-## Type discipline
-
-- `from __future__ import annotations` at top of every new file
-- `cast()` over `# type: ignore`
-- `dict[str, Any]` for raw spec/JSON data only — use models everywhere else
-- Protocol for injectable callbacks (see `SubprocessRunner` in `codegen.py`)
-
-## Reusable helpers (don't reimplement)
-
-| Helper | Location | Does |
-|---|---|---|
-| `_function_name(endpoint)` | `generate/codegen.py:314` | operationId → snake_case name |
-| `_safe_identifier(s)` | `generate/codegen.py:369` | Python-safe identifier |
-| `_path_expression(path)` | `generate/codegen.py:323` | `/foo/{id}` → f-string expr |
-| `write_output(result, ...)` | `output/writer.py` | stdout / file / clipboard |
-| `load_openapi(source)` | `ingest/openapi_ingest.py` | URL or file → `APIClientModel` |
-| `get_provider(name)` | `llm/provider.py` | gemini / ollama / null |
-
-## Test patterns
-
-```python
-# Fixture: tests/fixtures/petstore.yaml exists — use it
-from apidiom.ingest.openapi_ingest import load_openapi
-model = load_openapi("tests/fixtures/petstore.yaml")
-
-# Monkeypatching pipeline (not httpx)
-monkeypatch.setattr(server.pipeline, "generate_client", lambda *a, **k: fake_result)
-
-# CLI testing
-from click.testing import CliRunner
-result = CliRunner().invoke(main, ["mcp", "tests/fixtures/petstore.yaml"])
-assert result.exit_code == 0
-```
-
-## What NOT to add
-
-- No databases, sessions, accounts, payments (AGENTS.md)
-- No new CLI flags "for future use"
-- No abstract base class with one implementation
-- No config file parsing (env vars only, via `config.py`)
+- Every new library function gets at least one unit test.
+- Integration tests spawn the compiled `dist/cli.js` via `spawnSync`.
+- Smoke tests for generated MCP servers use the `bookApiSpec` helper in `cli.test.ts`.
+- No mocking of internal modules — tests call real functions with fixture data.
+- Test path-item parameter override (operation-level wins over path-level) explicitly.

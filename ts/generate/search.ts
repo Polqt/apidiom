@@ -1,6 +1,6 @@
 import type { ToolMetadata } from "./tools";
 
-export interface ScoredTool {
+interface ScoredTool {
   tool: ToolMetadata;
   score: number;
 }

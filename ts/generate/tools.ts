@@ -56,7 +56,7 @@ export function enrichDescription(
   return parts.length > 0 ? parts.join(". ") + "." : "";
 }
 
-export function filterEndpoints(
+function filterEndpoints(
   endpoints: APIEndpoint[],
   opts: ToolGenOptions
 ): APIEndpoint[] {

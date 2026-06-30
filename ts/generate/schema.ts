@@ -3,7 +3,7 @@ import { buildToolMetadata, type ToolGenOptions } from "./tools";
 
 export type SchemaFormat = "anthropic" | "openai";
 
-export interface SchemaGenOptions extends ToolGenOptions {
+interface SchemaGenOptions extends ToolGenOptions {
   format: SchemaFormat;
 }
 

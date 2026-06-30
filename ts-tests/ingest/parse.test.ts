@@ -47,6 +47,39 @@ describe("parseOpenAPI", () => {
     expect(ep!.parameters[0].required).toBe(true);
   });
 
+  it("extracts path-item parameters shared by operations", () => {
+    const model = parseOpenAPI({
+      openapi: "3.0.3",
+      info: { title: "Books", version: "1.0.0" },
+      paths: {
+        "/books/{bookId}": {
+          parameters: [
+            {
+              name: "bookId",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          get: {
+            operationId: "getBook",
+            responses: { "200": { description: "OK" } },
+          },
+        },
+      },
+    });
+
+    expect(model.endpoints[0].parameters).toEqual([
+      {
+        name: "bookId",
+        in: "path",
+        required: true,
+        description: undefined,
+        schema: { type: "string" },
+      },
+    ]);
+  });
+
   it("extracts POST /pets request body", () => {
     const model = parseOpenAPI(doc);
     const ep = model.endpoints.find(

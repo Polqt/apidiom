@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "pack:smoke": "node scripts/pack-smoke.cjs --clean && npm pack --pack-destination .tmp/pack-smoke --cache .tmp/pack-smoke-cache --silent && node scripts/pack-smoke.cjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -23,6 +24,7 @@
     "claude",
     "tool-calling"
   ],
+  "license": "MIT",
   "homepage": "https://github.com/poyhi/apidiom",
   "repository": {
     "type": "git",
@@ -37,7 +39,7 @@
     "@types/node": "^20.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0",
-    "vitest": "^2.0.0"
+    "vitest": "^4.1.9"
   },
   "engines": {
     "node": ">=18"

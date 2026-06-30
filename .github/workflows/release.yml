@@ -18,6 +18,9 @@ jobs:
           node-version: "20"
           cache: "npm"
           registry-url: "https://registry.npmjs.org"
+      - name: Verify release version
+        run: |
+          node -e "const expected = 'v' + require('./package.json').version; if (process.env.GITHUB_REF_NAME !== expected) throw new Error('Release tag must be ' + expected)"
       - name: Install
         run: npm ci
       - name: Build
@@ -26,6 +29,8 @@ jobs:
         run: npm run typecheck
       - name: Test
         run: npm test
+      - name: Pack smoke
+        run: npm run pack:smoke
       - name: Publish to npm
         run: npm publish --access public
         env:

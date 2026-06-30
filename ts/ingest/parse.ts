@@ -16,10 +16,11 @@ export function parseOpenAPI(doc: Doc): APIModel {
 
   const endpoints: APIEndpoint[] = [];
   for (const [path, pathItem] of Object.entries(paths)) {
+    const pathParams = ((pathItem as Doc)["parameters"] as Doc[]) ?? [];
     for (const method of ["get", "post", "put", "patch", "delete", "head", "options"]) {
       const op = (pathItem as Record<string, Doc>)[method];
       if (!op) continue;
-      endpoints.push(parseEndpoint(path, method.toUpperCase(), op));
+      endpoints.push(parseEndpoint(path, method.toUpperCase(), op, pathParams));
     }
   }
 
@@ -36,8 +37,9 @@ export function parseOpenAPI(doc: Doc): APIModel {
   };
 }
 
-function parseEndpoint(path: string, method: string, op: Doc): APIEndpoint {
-  const rawParams = (op["parameters"] as Doc[]) ?? [];
+function parseEndpoint(path: string, method: string, op: Doc, pathParams: Doc[] = []): APIEndpoint {
+  const opParams = (op["parameters"] as Doc[]) ?? [];
+  const rawParams = mergeParameters(pathParams, opParams);
   const parameters: OpenAPIParam[] = rawParams.map((p) => ({
     name: String(p["name"] ?? ""),
     in: p["in"] as OpenAPIParam["in"],
@@ -74,6 +76,14 @@ function parseEndpoint(path: string, method: string, op: Doc): APIEndpoint {
     parameters,
     requestBody,
   };
+}
+
+function mergeParameters(pathParams: Doc[], opParams: Doc[]): Doc[] {
+  const merged = new Map<string, Doc>();
+  for (const param of pathParams.concat(opParams)) {
+    merged.set(`${String(param["in"] ?? "")}:${String(param["name"] ?? "")}`, param);
+  }
+  return Array.from(merged.values());
 }
 
 function parseAuthScheme(name: string, scheme: Doc): AuthScheme {

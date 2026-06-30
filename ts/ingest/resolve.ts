@@ -3,8 +3,7 @@ import type { Doc } from "../model";
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete", "head", "options"];
 
 /**
- * Resolves local $ref pointers at the parameter and requestBody level only.
- * Does NOT recurse into schemas — avoids OOM on large specs like Stripe.
+ * Resolves local references used by generated tool inputs.
  */
 export function resolveRefs(doc: Doc): Doc {
   const paths = doc["paths"] as Record<string, Doc> | undefined;
@@ -27,6 +26,49 @@ export function resolveRefs(doc: Doc): Doc {
     return node;
   }
 
+  const schemaCache = new Map<string, unknown>();
+
+  function resolveSchema(node: unknown, activeRefs = new Set<string>()): unknown {
+    if (Array.isArray(node)) {
+      return node.map((item) => resolveSchema(item, activeRefs));
+    }
+    if (typeof node !== "object" || node === null) return node;
+
+    const schema = node as Doc;
+    const ref = schema["$ref"];
+    if (typeof ref === "string" && ref.startsWith("#/")) {
+      if (activeRefs.has(ref)) return {};
+      if (Object.keys(schema).length === 1 && schemaCache.has(ref)) {
+        return schemaCache.get(ref);
+      }
+
+      const target = lookup(ref);
+      if (typeof target !== "object" || target === null) return node;
+
+      const nextRefs = new Set(activeRefs);
+      nextRefs.add(ref);
+      const siblings = Object.fromEntries(
+        Object.entries(schema).filter(([key]) => key !== "$ref")
+      );
+      const resolved = resolveSchema({ ...(target as Doc), ...siblings }, nextRefs);
+      if (Object.keys(schema).length === 1) schemaCache.set(ref, resolved);
+      return resolved;
+    }
+
+    return Object.fromEntries(
+      Object.entries(schema).map(([key, value]) => [key, resolveSchema(value, activeRefs)])
+    );
+  }
+
+  function resolveParameter(node: unknown): unknown {
+    const parameter = deref(node);
+    if (typeof parameter !== "object" || parameter === null) return parameter;
+    const value = parameter as Doc;
+    return value["schema"] === undefined
+      ? value
+      : { ...value, schema: resolveSchema(value["schema"]) };
+  }
+
   const resolvedPaths: Record<string, Doc> = {};
 
   for (const [path, pathItem] of Object.entries(paths)) {
@@ -36,8 +78,8 @@ export function resolveRefs(doc: Doc): Doc {
     }
 
     const pi = pathItem as Doc;
-    // Path-level shared parameters
-    const sharedParams = (pi["parameters"] as unknown[] | undefined)?.map(deref) ?? [];
+    const sharedParams =
+      (pi["parameters"] as unknown[] | undefined)?.map(resolveParameter) ?? [];
     const resolved: Doc = { ...pi };
 
     for (const method of HTTP_METHODS) {
@@ -45,8 +87,8 @@ export function resolveRefs(doc: Doc): Doc {
       if (typeof op !== "object" || op === null) continue;
       const operation = op as Doc;
 
-      // Merge shared params under operation params (operation-level wins)
-      const opParams = (operation["parameters"] as unknown[] | undefined)?.map(deref) ?? [];
+      const opParams =
+        (operation["parameters"] as unknown[] | undefined)?.map(resolveParameter) ?? [];
       const mergedParams = mergeParams(sharedParams, opParams);
 
       resolved[method] = {
@@ -58,7 +100,6 @@ export function resolveRefs(doc: Doc): Doc {
       };
     }
 
-    // Remove path-level parameters (now merged into each operation)
     const { parameters: _, ...pathWithoutParams } = resolved;
     resolvedPaths[path] = pathWithoutParams;
   }

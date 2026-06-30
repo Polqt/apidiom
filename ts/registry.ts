@@ -1,7 +1,7 @@
 import registryData from "./registry.json";
 import { existsSync } from "fs";
 
-export interface RegistryEntry {
+interface RegistryEntry {
   url: string;
   description: string;
 }

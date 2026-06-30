@@ -3,8 +3,10 @@ import path from "path";
 import yaml from "js-yaml";
 import fs from "fs";
 import { parseOpenAPI } from "../../ts/ingest/parse";
+import { resolveRefs } from "../../ts/ingest/resolve";
 import { extractAuth } from "../../ts/auth";
-import { generateMCPServer, normalizeToolName, enrichDescription } from "../../ts/generate/mcp";
+import { generateMCPServer } from "../../ts/generate/mcp";
+import { normalizeToolName, enrichDescription } from "../../ts/generate/tools";
 import type { APIModel } from "../../ts/model";
 
 const FIXTURE_PATH = path.resolve(__dirname, "../fixtures/petstore.yaml");
@@ -64,6 +66,40 @@ describe("generateMCPServer", () => {
   it("output is valid JavaScript (no syntax errors)", () => {
     const output = generateMCPServer(model, auth);
     expect(() => new Function(output)).not.toThrow();
+  });
+
+  it("inlines local schema refs used by tool parameters", () => {
+    const resolved = resolveRefs({
+      openapi: "3.0.3",
+      info: { title: "Discord-like API", version: "1.0.0" },
+      servers: [{ url: "https://api.example.com" }],
+      paths: {
+        "/channels/{channel_id}": {
+          get: {
+            operationId: "getChannel",
+            parameters: [
+              {
+                name: "channel_id",
+                in: "path",
+                required: true,
+                schema: { $ref: "#/components/schemas/SnowflakeType" },
+              },
+            ],
+            responses: { "200": { description: "OK" } },
+          },
+        },
+      },
+      components: {
+        schemas: {
+          SnowflakeType: { type: "string", pattern: "^[0-9]+$" },
+        },
+      },
+    });
+
+    const output = generateMCPServer(parseOpenAPI(resolved), []);
+
+    expect(output).not.toContain("#/components/schemas/SnowflakeType");
+    expect(output).toContain('"pattern":"^[0-9]+$"');
   });
 
   it("prefixes tool name with tag when groupByTag is true", () => {

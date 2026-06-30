@@ -22,8 +22,9 @@ function collect(value: string, previous: string[]): string[] {
 }
 
 function parseMaxTools(value: string): number | null {
-  const parsed = parseInt(value, 10);
-  return isNaN(parsed) || parsed < 1 ? null : parsed;
+  if (!/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : null;
 }
 
 generate
