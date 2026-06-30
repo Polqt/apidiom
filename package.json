@@ -17,12 +17,16 @@
   ],
   "keywords": [
     "mcp",
+    "model-context-protocol",
     "openapi",
     "ai",
     "llm",
     "api",
     "claude",
-    "tool-calling"
+    "tool-calling",
+    "ai-agents",
+    "code-generator",
+    "cli"
   ],
   "license": "MIT",
   "homepage": "https://github.com/poyhi/apidiom",

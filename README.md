@@ -53,6 +53,33 @@ apidiom generate mcp petstore
 apidiom generate mcp --list
 ```
 
+## Project Config (apidiom.yaml)
+
+For projects integrating multiple APIs, use a config file instead of flags:
+
+```bash
+apidiom init          # scaffold apidiom.yaml in current directory
+apidiom run           # generate all targets
+apidiom run discord   # generate single target
+apidiom run --config path/to/apidiom.yaml
+```
+
+`apidiom.yaml` format:
+
+```yaml
+targets:
+  discord:
+    source: discord          # registry name, URL, or file path
+    output: mcp/discord.js
+    mode: search             # flat | search | auto (default: auto)
+  stripe:
+    source: stripe
+    output: mcp/stripe.js
+    tags: [payments, billing]
+```
+
+Output directories are created automatically.
+
 ## Connect to Claude Desktop
 
 `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
@@ -81,6 +108,7 @@ apidiom generate mcp --list
 | `cloudflare` | Cloudflare API |
 | `twilio` | Twilio Programmable API |
 | `discord` | Discord HTTP API |
+| `slack` | Slack Web API |
 | `spotify` | Spotify Web API |
 | `zoom` | Zoom Video Conferencing API |
 | `notion` | Notion API |
@@ -96,6 +124,8 @@ Output is a **single self-contained JS file** — zero npm dependencies, Node.js
 - One MCP tool per API endpoint with full parameter schemas
 - Auth read from env vars — fails fast with a clear error if missing
 - `$ref` pointers in OpenAPI specs resolved automatically
+- **Flat mode** (default for small APIs): all tools exposed in `tools/list`
+- **Search mode** (auto for large APIs): two meta-tools — `search_tools` and `call_tool` — replace the full list; auto-switches when tool count exceeds 40
 
 Auth env var names are derived from the security scheme name:
 `STRIPE_BEARER_TOKEN`, `GITHUB_BEARER_TOKEN`, `OPENAI_BEARER_TOKEN`, etc.
