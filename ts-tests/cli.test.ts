@@ -390,6 +390,81 @@ describe("CLI integration", () => {
     expect(output).toContain("call_tool");
     expect(output).not.toContain("_TOOLS.map(function(t)");
   });
+
+  it("init creates apidiom.yaml in a temp dir", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "apidiom-init-"));
+    try {
+      const result = spawnSync(process.execPath, [CLI, "init"], { cwd: tmpDir, encoding: "utf-8" });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Created apidiom.yaml");
+      const content = fs.readFileSync(path.join(tmpDir, "apidiom.yaml"), "utf-8");
+      expect(content).toContain("targets:");
+      expect(content).toContain("apidiom run");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("init exits 1 if apidiom.yaml already exists", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "apidiom-init-"));
+    try {
+      fs.writeFileSync(path.join(tmpDir, "apidiom.yaml"), "targets: {}\n");
+      const result = spawnSync(process.execPath, [CLI, "init"], { cwd: tmpDir, encoding: "utf-8" });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("already exists");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("run reads apidiom.yaml and generates output files", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "apidiom-run-"));
+    try {
+      const outFile = path.join(tmpDir, "out", "petstore.js");
+      const config = `targets:\n  petstore:\n    source: ${FIXTURE}\n    output: ${outFile}\n`;
+      const configPath = path.join(tmpDir, "apidiom.yaml");
+      fs.writeFileSync(configPath, config);
+      const result = spawnSync(process.execPath, [CLI, "run", "--config", configPath], {
+        cwd: ROOT, encoding: "utf-8"
+      });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("✓");
+      expect(result.stdout).toContain("petstore");
+      expect(fs.existsSync(outFile)).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("run with unknown target exits 1 with helpful message", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "apidiom-run-"));
+    try {
+      const config = `targets:\n  petstore:\n    source: ${FIXTURE}\n    output: out.js\n`;
+      const configPath = path.join(tmpDir, "apidiom.yaml");
+      fs.writeFileSync(configPath, config);
+      const result = spawnSync(process.execPath, [CLI, "run", "bogus", "--config", configPath], {
+        cwd: ROOT, encoding: "utf-8"
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("unknown target");
+      expect(result.stderr).toContain("bogus");
+      expect(result.stderr).toContain("petstore");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("run exits 1 when config file missing and suggests init", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "apidiom-run-"));
+    try {
+      const result = spawnSync(process.execPath, [CLI, "run"], { cwd: tmpDir, encoding: "utf-8" });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("config file not found");
+      expect(result.stderr).toContain("apidiom init");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 function bookApiSpec(port: number): string {

@@ -27,6 +27,10 @@
     "url": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/yaml/twilio_api_v2010.yaml",
     "description": "Twilio Programmable API"
   },
+  "slack": {
+    "url": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/slack.com/1.7.0/openapi.yaml",
+    "description": "Slack Web API"
+  },
   "discord": {
     "url": "https://raw.githubusercontent.com/discord/discord-api-spec/main/specs/openapi.json",
     "description": "Discord HTTP API"

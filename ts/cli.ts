@@ -1,11 +1,13 @@
 import { Command } from "commander";
 import fs from "fs/promises";
+import path from "path";
 import { fetchSpec } from "./ingest/fetch";
 import { parseOpenAPI } from "./ingest/parse";
 import { extractAuth } from "./auth";
 import { generateMCPServer } from "./generate/mcp";
 import { buildToolMetadata } from "./generate/tools";
 import { generateToolSchema, type SchemaFormat } from "./generate/schema";
+import { parseConfig, type TargetConfig } from "./config";
 import { REGISTRY } from "./registry";
 
 const program = new Command();
@@ -172,6 +174,116 @@ generate
       process.stderr.write(`Error: ${msg}\n`);
       process.exit(1);
     }
+  });
+
+const INIT_TEMPLATE = `# apidiom.yaml
+# Run \`apidiom run\` to regenerate all targets.
+# Run \`apidiom run <name>\` to regenerate a single target.
+
+targets:
+  # discord:
+  #   source: discord          # registry name, URL, or file path
+  #   output: mcp/discord.js   # output file (directories created automatically)
+  #   mode: search             # flat | search | auto (default: auto)
+  #   tags: []                 # filter by OpenAPI tag
+  #   include: []              # filter by operationId
+  #   group-by-tag: false      # prefix tool names with tag
+  #   max-tools: 40            # threshold before auto-switching to search mode
+`;
+
+program
+  .command("init")
+  .description("Create a starter apidiom.yaml in the current directory")
+  .action(async () => {
+    const dest = path.join(process.cwd(), "apidiom.yaml");
+    try {
+      await fs.access(dest);
+      process.stderr.write(`apidiom.yaml already exists at ${dest}\n`);
+      process.exit(1);
+    } catch {
+      await fs.writeFile(dest, INIT_TEMPLATE, "utf-8");
+      process.stdout.write(`Created apidiom.yaml\n`);
+    }
+  });
+
+async function runMCPTarget(name: string, t: TargetConfig): Promise<string> {
+  const source = t.source;
+  const maxTools = t.maxTools ?? 40;
+  const doc = await fetchSpec(source);
+  const model = parseOpenAPI(doc);
+  const serviceName = Object.keys(REGISTRY).find(
+    (k) => REGISTRY[k].url === source || k === source.toLowerCase()
+  );
+  const auth = extractAuth(model, serviceName);
+  const hasUnsupportedAuth = model.authSchemes.some(
+    (s) => s.type === "oauth2" || s.type === "openIdConnect"
+  );
+  if (hasUnsupportedAuth && auth.length === 0) {
+    process.stderr.write(
+      `Warning [${name}]: uses OAuth2/OpenID Connect - API calls will be unauthenticated.\n`
+    );
+  }
+  const toolOptions = {
+    tags: t.tags && t.tags.length > 0 ? t.tags : undefined,
+    include: t.include && t.include.length > 0 ? t.include : undefined,
+  };
+  const toolCount = buildToolMetadata(model.endpoints, toolOptions).length;
+  let mode: "flat" | "search" = t.mode === "search" ? "search" : "flat";
+  if ((t.mode === undefined || t.mode === "auto") && toolCount > maxTools) {
+    mode = "search";
+  }
+  const code = generateMCPServer(model, auth, {
+    ...toolOptions,
+    groupByTag: t.groupByTag,
+    mode,
+  });
+  const outPath = path.resolve(t.output);
+  await fs.mkdir(path.dirname(outPath), { recursive: true });
+  await fs.writeFile(outPath, code, "utf-8");
+  return `${toolCount} tools, ${mode} mode`;
+}
+
+program
+  .command("run [target]")
+  .description("Generate from apidiom.yaml (all targets, or a single named target)")
+  .option("--config <file>", "Path to config file (default: ./apidiom.yaml)")
+  .action(async (target: string | undefined, opts: { config?: string }) => {
+    const configPath = path.resolve(opts.config ?? "apidiom.yaml");
+    let raw: string;
+    try {
+      raw = await fs.readFile(configPath, "utf-8");
+    } catch {
+      process.stderr.write(`Error: config file not found: ${configPath}\n`);
+      process.stderr.write(`  Run \`apidiom init\` to create one.\n`);
+      process.exit(1);
+    }
+    let config;
+    try {
+      config = parseConfig(raw);
+    } catch (err) {
+      process.stderr.write(`Error parsing ${configPath}: ${err instanceof Error ? err.message : String(err)}\n`);
+      process.exit(1);
+    }
+    if (target && !config.targets[target]) {
+      const known = Object.keys(config.targets).join(", ");
+      process.stderr.write(`Error: unknown target "${target}". Known targets: ${known}\n`);
+      process.exit(1);
+    }
+    const targets = target
+      ? { [target]: config.targets[target] }
+      : config.targets;
+    let ok = true;
+    for (const [name, t] of Object.entries(targets)) {
+      try {
+        const summary = await runMCPTarget(name, t);
+        process.stdout.write(`✓ ${name.padEnd(16)} →  ${t.output}  (${summary})\n`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        process.stderr.write(`✗ ${name}: ${msg}\n`);
+        ok = false;
+      }
+    }
+    if (!ok) process.exit(1);
   });
 
 program.parse(process.argv);
