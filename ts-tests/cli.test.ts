@@ -465,6 +465,23 @@ describe("CLI integration", () => {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("run with mode: flat and max-tools exceeded exits 1 with clear error", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "apidiom-run-"));
+    try {
+      const config = `targets:\n  petstore:\n    source: ${FIXTURE}\n    output: ${path.join(tmpDir, "out.js")}\n    mode: flat\n    max-tools: 1\n`;
+      const configPath = path.join(tmpDir, "apidiom.yaml");
+      fs.writeFileSync(configPath, config);
+      const result = spawnSync(process.execPath, [CLI, "run", "--config", configPath], {
+        cwd: ROOT, encoding: "utf-8"
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("exceeds max-tools limit");
+      expect(result.stderr).toContain("mode: search");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 function bookApiSpec(port: number): string {

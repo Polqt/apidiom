@@ -58,36 +58,36 @@ function generateAuthSection(auth: AuthConfig[]): string | null {
 function generateRequestHelper(): string {
   return `function _request(method, url, headers, body) {
   return new Promise(function(resolve, reject) {
-      var u = new URL(url);
-      var lib = u.protocol === "https:" ? https : http;
-      var opts = {
-        hostname: u.hostname,
-        port: u.port || undefined,
-        path: u.pathname + u.search,
-        method: method,
-        headers: Object.assign({}, body !== undefined ? { "Content-Type": "application/json" } : {}, headers)
-      };
-      var req = lib.request(opts, function(res) {
-        var d = "";
-        res.on("data", function(c) { d += c; });
-        res.on("error", reject);
-        res.on("end", function() {
-          var result;
-          try { result = JSON.parse(d); } catch(e) { result = d; }
-          var status = res.statusCode || 0;
-          if (status < 200 || status >= 300) {
-            var detail = typeof result === "string" ? result : JSON.stringify(result);
-            reject(new Error("HTTP " + status + (detail ? ": " + detail : "")));
-            return;
-          }
-          resolve(result);
-        });
+    var u = new URL(url);
+    var lib = u.protocol === "https:" ? https : http;
+    var opts = {
+      hostname: u.hostname,
+      port: u.port || undefined,
+      path: u.pathname + u.search,
+      method: method,
+      headers: Object.assign({}, body !== undefined ? { "Content-Type": "application/json" } : {}, headers)
+    };
+    var req = lib.request(opts, function(res) {
+      var d = "";
+      res.on("data", function(c) { d += c; });
+      res.on("error", reject);
+      res.on("end", function() {
+        var result;
+        try { result = JSON.parse(d); } catch(e) { result = d; }
+        var status = res.statusCode || 0;
+        if (status < 200 || status >= 300) {
+          var detail = typeof result === "string" ? result : JSON.stringify(result);
+          reject(new Error("HTTP " + status + (detail ? ": " + detail : "")));
+          return;
+        }
+        resolve(result);
       });
-      req.on("error", reject);
-      if (body !== undefined) req.write(JSON.stringify(body));
-      req.end();
     });
-  }`;
+    req.on("error", reject);
+    if (body !== undefined) req.write(JSON.stringify(body));
+    req.end();
+  });
+}`;
 }
 
 function generateToolsArray(tools: ToolMetadata[], serverUrl: string, auth: AuthConfig[]): string {
@@ -262,33 +262,33 @@ function generateMCPHandler(serverName: string, version: string): string {
 function generateSearchHandler(serverName: string, version: string): string {
   const scorer = `function _tokenize(text) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(/\\s+/).filter(Boolean);
-  }
-  function _scoreTools(query) {
-    var qt = _tokenize(query);
-    if (!qt.length) return [];
-    var scored = [];
-    for (var i = 0; i < _TOOLS.length; i++) {
-      var tool = _TOOLS[i];
-      var nameTokens = _tokenize(tool.name);
-      var descTokens = _tokenize(tool.description);
-      var tagTokens = [].concat.apply([], (_TOOLS[i]._tags || []).map(_tokenize));
-      var score = 0; var covered = 0;
-      for (var j = 0; j < qt.length; j++) {
-        var q = qt[j]; var ts = 0;
-        if (nameTokens.indexOf(q) !== -1) ts += 10;
-        else if (tool.name.toLowerCase().indexOf(q) !== -1) ts += 5;
-        if (descTokens.indexOf(q) !== -1) ts += 2;
-        else if (tool.description.toLowerCase().indexOf(q) !== -1) ts += 1;
-        if (tagTokens.indexOf(q) !== -1) ts += 3;
-        if (ts > 0) covered++;
-        score += ts;
-      }
-      if (score > 0) {
-        scored.push({ tool: tool, score: score * (0.5 + 0.5 * covered / qt.length) });
-      }
+}
+function _scoreTools(query) {
+  var qt = _tokenize(query);
+  if (!qt.length) return [];
+  var scored = [];
+  for (var i = 0; i < _TOOLS.length; i++) {
+    var tool = _TOOLS[i];
+    var nameTokens = _tokenize(tool.name);
+    var descTokens = _tokenize(tool.description);
+    var tagTokens = [].concat.apply([], (_TOOLS[i]._tags || []).map(_tokenize));
+    var score = 0; var covered = 0;
+    for (var j = 0; j < qt.length; j++) {
+      var q = qt[j]; var ts = 0;
+      if (nameTokens.indexOf(q) !== -1) ts += 10;
+      else if (tool.name.toLowerCase().indexOf(q) !== -1) ts += 5;
+      if (descTokens.indexOf(q) !== -1) ts += 2;
+      else if (tool.description.toLowerCase().indexOf(q) !== -1) ts += 1;
+      if (tagTokens.indexOf(q) !== -1) ts += 3;
+      if (ts > 0) covered++;
+      score += ts;
     }
-    return scored.sort(function(a, b) { return b.score - a.score; });
+    if (score > 0) {
+      scored.push({ tool: tool, score: score * (0.5 + 0.5 * covered / qt.length) });
+    }
   }
+  return scored.sort(function(a, b) { return b.score - a.score; });
+}
 
   var _META_TOOLS = [
     {

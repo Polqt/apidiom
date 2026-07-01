@@ -2,9 +2,6 @@ import type { Doc } from "../model";
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete", "head", "options"];
 
-/**
- * Resolves local references used by generated tool inputs.
- */
 export function resolveRefs(doc: Doc): Doc {
   const paths = doc["paths"] as Record<string, Doc> | undefined;
   if (!paths) return doc;

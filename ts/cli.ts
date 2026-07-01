@@ -229,6 +229,11 @@ async function runMCPTarget(name: string, t: TargetConfig): Promise<string> {
   };
   const toolCount = buildToolMetadata(model.endpoints, toolOptions).length;
   let mode: "flat" | "search" = t.mode === "search" ? "search" : "flat";
+  if (t.mode === "flat" && toolCount > maxTools) {
+    throw new Error(
+      `${toolCount} tools exceeds max-tools limit of ${maxTools} for flat mode. Use mode: search or raise max-tools.`
+    );
+  }
   if ((t.mode === undefined || t.mode === "auto") && toolCount > maxTools) {
     mode = "search";
   }
