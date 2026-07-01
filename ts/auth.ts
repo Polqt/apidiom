@@ -12,10 +12,15 @@ export function extractAuth(model: APIModel, serviceName?: string): AuthConfig[]
           envVar: `${prefix}_${toEnvKey(keyName)}`,
           headerName: keyName,
           headerFormat: "{value}",
-          queryParam: keyName,  // signals query-param auth
+          queryParam: keyName,
+        });
+      } else if (scheme.apiKeyIn === "cookie") {
+        result.push({
+          envVar: `${prefix}_${toEnvKey(keyName)}`,
+          headerName: "Cookie",
+          headerFormat: `${keyName}={value}`,
         });
       } else {
-        // header (default)
         result.push({
           envVar: `${prefix}_${toEnvKey(keyName)}`,
           headerName: keyName,

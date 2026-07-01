@@ -45,6 +45,7 @@ apidiom generate schema petstore --format openai --output tools.json
 apidiom generate mcp github --tag repos
 apidiom generate mcp openai --include createChatCompletion --output openai-mcp.js
 apidiom generate schema petstore --format anthropic --tag pets
+apidiom generate schema github --format anthropic --group-by-tag --output tools.json
 
 # stdout (pipe-friendly; on Windows PowerShell use --output instead of >)
 apidiom generate mcp petstore
@@ -58,9 +59,10 @@ apidiom generate mcp --list
 For projects integrating multiple APIs, use a config file instead of flags:
 
 ```bash
-apidiom init          # scaffold apidiom.yaml in current directory
-apidiom run           # generate all targets
-apidiom run discord   # generate single target
+apidiom init                        # scaffold apidiom.yaml in current directory
+apidiom run                         # generate all targets
+apidiom run discord                 # generate single target
+apidiom run --dry-run               # preview what would be generated without writing files
 apidiom run --config path/to/apidiom.yaml
 ```
 
@@ -136,7 +138,7 @@ Auth env var names are derived from the security scheme name:
 
 ## Known Limitations
 
-- External `$ref` files not supported (only `#/components/...` inline refs)
+- External `$ref` files not supported (only `#/components/...` inline refs) — a warning is printed and the ref is skipped
 - OAuth2 / OpenID Connect not supported in generated code
 
 ## Add a Service

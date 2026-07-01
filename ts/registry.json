@@ -29,7 +29,7 @@
   },
   "slack": {
     "url": "https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/APIs/slack.com/1.7.0/openapi.yaml",
-    "description": "Slack Web API"
+    "description": "Slack Web API (community OAS3 conversion, may be incomplete)"
   },
   "discord": {
     "url": "https://raw.githubusercontent.com/discord/discord-api-spec/main/specs/openapi.json",

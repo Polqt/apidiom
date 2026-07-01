@@ -129,10 +129,11 @@ generate
   .option("-o, --output <file>", "Write output to file (default: stdout)")
   .option("--tag <tag>", "Include only endpoints with this tag (repeatable)", collect, [])
   .option("--include <operationId>", "Include only this operationId (repeatable)", collect, [])
+  .option("--group-by-tag", "Prefix tool names with their OpenAPI tag (e.g. pets__list_pets)")
   .option("--max-tools <n>", "Warn when schema tool count exceeds this limit (default: 40)", "40")
   .action(async (
     source: string,
-    opts: { format: string; output?: string; tag: string[]; include: string[]; maxTools: string }
+    opts: { format: string; output?: string; tag: string[]; include: string[]; groupByTag?: boolean; maxTools: string }
   ) => {
     if (opts.format !== "anthropic" && opts.format !== "openai") {
       process.stderr.write("Error: --format must be anthropic or openai\n");
@@ -150,6 +151,7 @@ generate
       const toolOptions = {
         tags: opts.tag.length > 0 ? opts.tag : undefined,
         include: opts.include.length > 0 ? opts.include : undefined,
+        groupByTag: opts.groupByTag,
       };
       const toolCount = buildToolMetadata(model.endpoints, toolOptions).length;
       if (toolCount > maxTools) {
@@ -158,10 +160,7 @@ generate
           `  Use --tag/--include to reduce raw SDK context size.\n`
         );
       }
-      const json = generateToolSchema(model, {
-        format: opts.format as SchemaFormat,
-        ...toolOptions,
-      });
+      const json = generateToolSchema(model, { format: opts.format as SchemaFormat, ...toolOptions });
 
       if (opts.output) {
         await fs.writeFile(opts.output, json, "utf-8");
@@ -206,7 +205,7 @@ program
     }
   });
 
-async function runMCPTarget(name: string, t: TargetConfig): Promise<string> {
+async function runMCPTarget(name: string, t: TargetConfig, dryRun = false): Promise<string> {
   const source = t.source;
   const maxTools = t.maxTools ?? 40;
   const doc = await fetchSpec(source);
@@ -237,14 +236,16 @@ async function runMCPTarget(name: string, t: TargetConfig): Promise<string> {
   if ((t.mode === undefined || t.mode === "auto") && toolCount > maxTools) {
     mode = "search";
   }
-  const code = generateMCPServer(model, auth, {
-    ...toolOptions,
-    groupByTag: t.groupByTag,
-    mode,
-  });
-  const outPath = path.resolve(t.output);
-  await fs.mkdir(path.dirname(outPath), { recursive: true });
-  await fs.writeFile(outPath, code, "utf-8");
+  if (!dryRun) {
+    const code = generateMCPServer(model, auth, {
+      ...toolOptions,
+      groupByTag: t.groupByTag,
+      mode,
+    });
+    const outPath = path.resolve(t.output);
+    await fs.mkdir(path.dirname(outPath), { recursive: true });
+    await fs.writeFile(outPath, code, "utf-8");
+  }
   return `${toolCount} tools, ${mode} mode`;
 }
 
@@ -252,7 +253,8 @@ program
   .command("run [target]")
   .description("Generate from apidiom.yaml (all targets, or a single named target)")
   .option("--config <file>", "Path to config file (default: ./apidiom.yaml)")
-  .action(async (target: string | undefined, opts: { config?: string }) => {
+  .option("--dry-run", "Show what would be generated without writing files")
+  .action(async (target: string | undefined, opts: { config?: string; dryRun?: boolean }) => {
     const configPath = path.resolve(opts.config ?? "apidiom.yaml");
     let raw: string;
     try {
@@ -277,11 +279,13 @@ program
     const targets = target
       ? { [target]: config.targets[target] }
       : config.targets;
+    if (opts.dryRun) process.stderr.write("Dry run — no files will be written.\n");
     let ok = true;
     for (const [name, t] of Object.entries(targets)) {
       try {
-        const summary = await runMCPTarget(name, t);
-        process.stdout.write(`✓ ${name.padEnd(16)} →  ${t.output}  (${summary})\n`);
+        const summary = await runMCPTarget(name, t, opts.dryRun);
+        const arrow = opts.dryRun ? "→ (dry)" : "→ ";
+        process.stdout.write(`✓ ${name.padEnd(16)} ${arrow} ${t.output}  (${summary})\n`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         process.stderr.write(`✗ ${name}: ${msg}\n`);

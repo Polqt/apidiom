@@ -16,10 +16,17 @@ export function resolveRefs(doc: Doc): Doc {
     return node;
   }
 
+  const warnedExternalRefs = new Set<string>();
+
   function deref(node: unknown): unknown {
     if (typeof node !== "object" || node === null) return node;
     const ref = (node as Doc)["$ref"];
-    if (typeof ref === "string" && ref.startsWith("#/")) return lookup(ref) ?? node;
+    if (typeof ref !== "string") return node;
+    if (ref.startsWith("#/")) return lookup(ref) ?? node;
+    if (!warnedExternalRefs.has(ref)) {
+      warnedExternalRefs.add(ref);
+      process.stderr.write(`Warning: external $ref "${ref}" not supported — skipped.\n`);
+    }
     return node;
   }
 
@@ -33,6 +40,13 @@ export function resolveRefs(doc: Doc): Doc {
 
     const schema = node as Doc;
     const ref = schema["$ref"];
+    if (typeof ref === "string" && !ref.startsWith("#/")) {
+      if (!warnedExternalRefs.has(ref)) {
+        warnedExternalRefs.add(ref);
+        process.stderr.write(`Warning: external $ref "${ref}" not supported — skipped.\n`);
+      }
+      return node;
+    }
     if (typeof ref === "string" && ref.startsWith("#/")) {
       if (activeRefs.has(ref)) return {};
       if (Object.keys(schema).length === 1 && schemaCache.has(ref)) {

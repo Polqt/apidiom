@@ -31,7 +31,7 @@ export interface AuthScheme {
   name: string;
   type: AuthType;
   scheme?: string;       // "bearer" | "basic" for http type
-  apiKeyIn?: "header" | "query" | "cookie";
+  apiKeyIn?: "header" | "query" | "cookie";  // cookie: generated as Cookie header
   apiKeyHeaderName?: string;
 }
 
