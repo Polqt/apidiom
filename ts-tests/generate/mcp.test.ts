@@ -310,4 +310,62 @@ describe("generateMCPServer — search mode", () => {
     expect(output).toContain("args.name");
     expect(output).toContain("args.arguments");
   });
+
+  it("resolves request paths against a base URL, not new URL(path) — regression for relative serverUrl", () => {
+    // A spec whose server URL carries a path prefix (e.g. /api/v3). The old code
+    // emitted `new URL(serverUrl + path)`, which throws for relative serverUrls
+    // and would silently drop the prefix here. Generated code must resolve the
+    // path relative to _BASE_URL so the prefix survives and calls succeed.
+    const model: APIModel = {
+      title: "Prefixed API",
+      version: "1.0.0",
+      serverUrl: "https://api.test.com/api/v3",
+      endpoints: [
+        { path: "/pets/{id}", method: "GET", operationId: "getPet", tags: [], parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ] },
+      ],
+      authSchemes: [],
+    };
+    const output = generateMCPServer(model, []);
+
+    expect(output).toContain('var _BASE_URL = (process.env.APIDIOM_BASE_URL || "https://api.test.com/api/v3")');
+    expect(output).toContain('new URL(pathAndQuery, _BASE_URL + "/")');
+    // path emitted relative (no leading slash, no serverUrl concatenation)
+    expect(output).toContain('_request("GET", ("pets/"');
+    expect(output).not.toContain("https://api.test.com/api/v3/pets");
+
+    // The emitted call fn, run against the base, must produce the correct absolute URL.
+    const base = "https://api.test.com/api/v3";
+    const relPath = "pets/" + encodeURIComponent("42");
+    expect(new URL(relPath, base + "/").toString()).toBe("https://api.test.com/api/v3/pets/42");
+  });
+
+  it("emits a request timeout guard", () => {
+    const model: APIModel = {
+      title: "T", version: "1.0.0", serverUrl: "https://api.test.com",
+      endpoints: [{ path: "/x", method: "GET", operationId: "getX", tags: [], parameters: [] }],
+      authSchemes: [],
+    };
+    const output = generateMCPServer(model, []);
+    expect(output).toContain("req.setTimeout");
+    expect(output).toContain("APIDIOM_TIMEOUT_MS");
+  });
+
+  it("auth headers win over a colliding user-supplied header param", () => {
+    const model: APIModel = {
+      title: "T", version: "1.0.0", serverUrl: "https://api.test.com",
+      endpoints: [{ path: "/x", method: "GET", operationId: "getX", tags: [], parameters: [
+        { name: "api_key", in: "header", required: false, schema: { type: "string" } },
+      ] }],
+      authSchemes: [],
+    };
+    const auth = [{ envVar: "T_API_KEY", headerName: "api_key", headerFormat: "{value}" }];
+    const output = generateMCPServer(model, auth);
+    // param assigned first, auth applied last via Object.assign
+    const paramIdx = output.indexOf('_headers["api_key"] = String(args["api_key"])');
+    const authIdx = output.indexOf("Object.assign(_headers,");
+    expect(paramIdx).toBeGreaterThan(-1);
+    expect(authIdx).toBeGreaterThan(paramIdx);
+  });
 });

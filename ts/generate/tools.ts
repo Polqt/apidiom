@@ -99,10 +99,19 @@ export function buildInputSchema(endpoint: APIEndpoint): ToolMetadata["inputSche
   }
 
   if (endpoint.requestBody) {
-    properties.body = {
-      type: "object",
-      description: endpoint.requestBody.description ?? "Request body",
-    };
+    // Pass the real resolved body schema through so the agent sees actual fields,
+    // not an opaque {type:object}. Falls back to a bare object for empty schemas.
+    const schema = endpoint.requestBody.schema;
+    const hasSchema = schema && Object.keys(schema).length > 0;
+    properties.body = hasSchema
+      ? {
+          ...schema,
+          description:
+            (schema as { description?: string }).description ??
+            endpoint.requestBody.description ??
+            "Request body",
+        }
+      : { type: "object", description: endpoint.requestBody.description ?? "Request body" };
     if (endpoint.requestBody.required) required.push("body");
   }
 

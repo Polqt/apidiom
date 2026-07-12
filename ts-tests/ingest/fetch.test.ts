@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fetchSpec, parseSpec } from "../../ts/ingest/fetch";
+import { fetchSpec, parseSpec, absolutizeServers } from "../../ts/ingest/fetch";
 
 const FIXTURE = "./ts-tests/fixtures/petstore.yaml";
 const BARE_RELATIVE_FIXTURE = "ts-tests/fixtures/petstore.yaml";
@@ -44,5 +44,29 @@ describe("parseSpec", () => {
 
   it("parses JSON content from .json file", () => {
     expect(parseSpec('{"openapi":"3.0.0"}', "spec.json")).toEqual({ openapi: "3.0.0" });
+  });
+});
+
+describe("absolutizeServers", () => {
+  it("resolves a relative server URL against the spec fetch origin", () => {
+    const doc = { servers: [{ url: "/api/v3" }] };
+    const out = absolutizeServers(doc, "https://petstore3.swagger.io/api/v3/openapi.json");
+    expect((out.servers as { url: string }[])[0].url).toBe("https://petstore3.swagger.io/api/v3");
+  });
+
+  it("leaves absolute server URLs untouched", () => {
+    const doc = { servers: [{ url: "https://api.stripe.com" }] };
+    const out = absolutizeServers(doc, "https://raw.githubusercontent.com/x/openapi.yaml");
+    expect((out.servers as { url: string }[])[0].url).toBe("https://api.stripe.com");
+  });
+
+  it("is a no-op for local specs (no fetch origin)", () => {
+    const doc = { servers: [{ url: "/v1" }] };
+    expect(absolutizeServers(doc, undefined)).toBe(doc);
+  });
+
+  it("tolerates a missing servers array", () => {
+    const doc = { openapi: "3.0.0" };
+    expect(absolutizeServers(doc, "https://api.example.com/spec.json")).toBe(doc);
   });
 });

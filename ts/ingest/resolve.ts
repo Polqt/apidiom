@@ -80,6 +80,26 @@ export function resolveRefs(doc: Doc): Doc {
       : { ...value, schema: resolveSchema(value["schema"]) };
   }
 
+  // Deref the requestBody envelope, then deep-resolve each content type's schema
+  // so body fields survive as concrete properties instead of an unresolved $ref.
+  function resolveRequestBody(node: unknown): unknown {
+    const body = deref(node);
+    if (typeof body !== "object" || body === null) return body;
+    const value = body as Doc;
+    const content = value["content"];
+    if (typeof content !== "object" || content === null) return value;
+    const resolvedContent = Object.fromEntries(
+      Object.entries(content as Record<string, unknown>).map(([mediaType, media]) => {
+        if (typeof media !== "object" || media === null) return [mediaType, media];
+        const m = media as Doc;
+        return m["schema"] === undefined
+          ? [mediaType, m]
+          : [mediaType, { ...m, schema: resolveSchema(m["schema"]) }];
+      })
+    );
+    return { ...value, content: resolvedContent };
+  }
+
   const resolvedPaths: Record<string, Doc> = {};
 
   for (const [path, pathItem] of Object.entries(paths)) {
@@ -106,7 +126,7 @@ export function resolveRefs(doc: Doc): Doc {
         ...operation,
         parameters: mergedParams,
         ...(operation["requestBody"] !== undefined
-          ? { requestBody: deref(operation["requestBody"]) }
+          ? { requestBody: resolveRequestBody(operation["requestBody"]) }
           : {}),
       };
     }

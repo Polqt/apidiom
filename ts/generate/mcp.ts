@@ -32,8 +32,9 @@ export function generateMCPServer(
     `const http = require("http");`,
     ``,
     generateAuthSection(auth),
+    generateBaseUrl(model.serverUrl),
     generateRequestHelper(),
-    generateToolsArray(tools, model.serverUrl, auth),
+    generateToolsArray(tools, auth),
     opts.mode === "search"
       ? generateSearchHandler(serverName, model.version)
       : generateMCPHandler(serverName, model.version),
@@ -55,10 +56,20 @@ function generateAuthSection(auth: AuthConfig[]): string | null {
   return lines.join("\n");
 }
 
+function generateBaseUrl(serverUrl: string): string {
+  return `var _BASE_URL = (process.env.APIDIOM_BASE_URL || ${JSON.stringify(serverUrl)}).replace(/\\/+$/, "");
+if (!/^https?:\\/\\//.test(_BASE_URL)) {
+  process.stderr.write("Spec has no absolute server URL. Set APIDIOM_BASE_URL to the API origin (e.g. https://api.example.com).\\n");
+  process.exit(1);
+}
+`;
+}
+
 function generateRequestHelper(): string {
-  return `function _request(method, url, headers, body) {
+  return `var _TIMEOUT_MS = Number(process.env.APIDIOM_TIMEOUT_MS) || 30000;
+function _request(method, pathAndQuery, headers, body) {
   return new Promise(function(resolve, reject) {
-    var u = new URL(url);
+    var u = new URL(pathAndQuery, _BASE_URL + "/");
     var lib = u.protocol === "https:" ? https : http;
     var opts = {
       hostname: u.hostname,
@@ -84,18 +95,19 @@ function generateRequestHelper(): string {
       });
     });
     req.on("error", reject);
+    req.setTimeout(_TIMEOUT_MS, function() { req.destroy(new Error("Request timed out after " + _TIMEOUT_MS + "ms")); });
     if (body !== undefined) req.write(JSON.stringify(body));
     req.end();
   });
 }`;
 }
 
-function generateToolsArray(tools: ToolMetadata[], serverUrl: string, auth: AuthConfig[]): string {
-  const rendered = tools.map((tool) => generateTool(tool, serverUrl, auth));
+function generateToolsArray(tools: ToolMetadata[], auth: AuthConfig[]): string {
+  const rendered = tools.map((tool) => generateTool(tool, auth));
   return `var _TOOLS = [\n${rendered.join(",\n")}\n];\n`;
 }
 
-function generateTool(tool: ToolMetadata, serverUrl: string, auth: AuthConfig[]): string {
+function generateTool(tool: ToolMetadata, auth: AuthConfig[]): string {
   const ep = tool.endpoint;
   const pathParams = ep.parameters.filter((p) => p.in === "path");
   const queryParams = ep.parameters.filter((p) => p.in === "query");
@@ -113,7 +125,7 @@ function generateTool(tool: ToolMetadata, serverUrl: string, auth: AuthConfig[])
       ? `{\n${authHeaderEntries.join(",\n")}\n    }`
       : "{}";
 
-  const urlParts = buildUrlParts(serverUrl, ep.path, pathParams);
+  const urlParts = buildUrlParts(ep.path, pathParams);
 
   const queryLines: string[] = [];
   queryLines.push(`    var _q = new URLSearchParams();`);
@@ -127,11 +139,16 @@ function generateTool(tool: ToolMetadata, serverUrl: string, auth: AuthConfig[])
   }
   queryLines.push(`    var _qs = _q.toString() ? "?" + _q.toString() : "";`);
 
-  const headerLines: string[] = [`    var _headers = ${authHeadersStr};`];
+  // Header params first, then auth headers via Object.assign so a user-supplied
+  // header param can never overwrite an injected credential.
+  const headerLines: string[] = [`    var _headers = {};`];
   for (const p of headerParams) {
     headerLines.push(
       `    if (args[${JSON.stringify(p.name)}] !== undefined) _headers[${JSON.stringify(p.name)}] = String(args[${JSON.stringify(p.name)}]);`
     );
+  }
+  if (authHeadersStr !== "{}") {
+    headerLines.push(`    Object.assign(_headers, ${authHeadersStr});`);
   }
 
   const bodyArg = ep.requestBody ? `args["body"]` : "undefined";
@@ -151,16 +168,20 @@ function generateTool(tool: ToolMetadata, serverUrl: string, auth: AuthConfig[])
 }
 
 function buildUrlParts(
-  serverUrl: string,
   path: string,
   pathParams: APIEndpoint["parameters"]
 ): string {
+  // Emit path relative to _BASE_URL (which carries the server's own prefix, e.g.
+  // /api/v3). A leading slash would make `new URL(path, base)` drop that prefix,
+  // so strip it and resolve against a trailing-slash base in _request.
+  const relPath = path.replace(/^\//, "");
+
   if (pathParams.length === 0) {
-    return JSON.stringify(serverUrl + path);
+    return JSON.stringify(relPath);
   }
 
   const segments: string[] = [];
-  let remaining = serverUrl + path;
+  let remaining = relPath;
   const paramPattern = /\{([^}]+)\}/;
   let match: RegExpExecArray | null;
 

@@ -126,11 +126,19 @@ Output is a **single self-contained JS file** — zero npm dependencies, Node.js
 - One MCP tool per API endpoint with full parameter schemas
 - Auth read from env vars — fails fast with a clear error if missing
 - `$ref` pointers in OpenAPI specs resolved automatically
+- Relative server URLs in the spec (e.g. `/api/v3`) are resolved against the spec's origin when fetched over HTTP
+- Per-request timeout (default 30s, override with `APIDIOM_TIMEOUT_MS`)
 - **Flat mode** (default for small APIs): all tools exposed in `tools/list`
 - **Search mode** (auto for large APIs): two meta-tools — `search_tools` and `call_tool` — replace the full list; auto-switches when tool count exceeds 40
 
 Auth env var names are derived from the security scheme name:
 `STRIPE_BEARER_TOKEN`, `GITHUB_BEARER_TOKEN`, `OPENAI_BEARER_TOKEN`, etc.
+
+**Base URL override** — set `APIDIOM_BASE_URL` to point the generated server at a different origin (staging, self-hosted, or when a local spec has no absolute server URL):
+
+```json
+"env": { "APIDIOM_BASE_URL": "https://api-staging.example.com", "STRIPE_BEARER_TOKEN": "sk_test_..." }
+```
 
 ## Generated Tool Schemas
 
@@ -140,6 +148,7 @@ Auth env var names are derived from the security scheme name:
 
 - External `$ref` files not supported (only `#/components/...` inline refs) — a warning is printed and the ref is skipped
 - OAuth2 / OpenID Connect not supported in generated code
+- Local specs with a relative-only server URL and no absolute origin: set `APIDIOM_BASE_URL` when running the generated server (it fails fast with a clear message otherwise)
 
 ## Add a Service
 

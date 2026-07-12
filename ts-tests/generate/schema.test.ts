@@ -3,13 +3,14 @@ import fs from "fs";
 import path from "path";
 import yaml from "js-yaml";
 import { parseOpenAPI } from "../../ts/ingest/parse";
+import { resolveRefs } from "../../ts/ingest/resolve";
 import { generateToolSchema } from "../../ts/generate/schema";
 import { buildInputSchema, deduplicateToolNames } from "../../ts/generate/tools";
 import type { APIEndpoint, APIModel } from "../../ts/model";
 
 const FIXTURE_PATH = path.resolve(__dirname, "../fixtures/petstore.yaml");
 const doc = yaml.load(fs.readFileSync(FIXTURE_PATH, "utf-8")) as Record<string, unknown>;
-const model = parseOpenAPI(doc);
+const model = parseOpenAPI(resolveRefs(doc));
 
 describe("generateToolSchema", () => {
   it("generates Anthropic tool schemas with endpoint params", () => {
@@ -59,15 +60,15 @@ describe("generateToolSchema", () => {
     ]);
   });
 
-  it("keeps request bodies as a single body object parameter", () => {
+  it("exposes the resolved request body schema as a single body parameter", () => {
     const output = JSON.parse(
       generateToolSchema(model, { format: "anthropic", include: ["createPet"] })
     );
 
-    expect(output[0].input_schema.properties.body).toEqual({
-      type: "object",
-      description: "Request body",
-    });
+    const body = output[0].input_schema.properties.body;
+    expect(body.type).toBe("object");
+    // Body is the real resolved Pet schema, not an opaque {type:object}.
+    expect(Object.keys(body.properties)).toContain("name");
     expect(output[0].input_schema.required).toEqual(["body"]);
   });
 
