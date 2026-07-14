@@ -363,5 +363,5 @@ function _scoreTools(query) {
 }
 
 function toSlug(title: string): string {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(?:^-|-$)/g, "");
 }

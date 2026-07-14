@@ -3,11 +3,10 @@ import fs from "fs/promises";
 import path from "path";
 import { fetchSpec } from "./ingest/fetch";
 import { parseOpenAPI } from "./ingest/parse";
-import { extractAuth } from "./auth";
-import { generateMCPServer } from "./generate/mcp";
 import { buildToolMetadata } from "./generate/tools";
 import { generateToolSchema, type SchemaFormat } from "./generate/schema";
 import { parseConfig, type TargetConfig } from "./config";
+import { generateMCP, runMCPTarget, type RequestedMCPMode } from "./pipeline";
 import { REGISTRY } from "./registry";
 
 const program = new Command();
@@ -29,6 +28,85 @@ function parseMaxTools(value: string): number | null {
   return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : null;
 }
 
+type MCPCommandOptions = {
+  output?: string;
+  tag: string[];
+  include: string[];
+  groupByTag?: boolean;
+  list?: boolean;
+  mode?: string;
+  maxTools: string;
+};
+
+function parseRequestedMode(mode: string | undefined): RequestedMCPMode {
+  if (mode === undefined || mode === "auto" || mode === "flat" || mode === "search") {
+    return mode;
+  }
+  process.stderr.write("Error: --mode must be auto, flat, or search\n");
+  process.exit(1);
+}
+
+function requireMaxTools(value: string): number {
+  const maxTools = parseMaxTools(value);
+  if (maxTools !== null) return maxTools;
+  process.stderr.write("Error: --max-tools must be a positive integer\n");
+  process.exit(1);
+}
+
+function requireSource(source: string | undefined): string {
+  if (source) return source;
+  process.stderr.write(
+    "Error: source argument required. Usage: apidiom generate mcp <service|url|file>\n"
+  );
+  process.exit(1);
+}
+
+function listServices(): void {
+  for (const [name, entry] of Object.entries(REGISTRY)) {
+    process.stdout.write(`${name.padEnd(16)} ${entry.description}\n`);
+  }
+}
+
+async function writeGeneratedOutput(output: string | undefined, contents: string): Promise<void> {
+  if (!output) {
+    process.stdout.write(contents);
+    return;
+  }
+  await fs.writeFile(output, contents, "utf-8");
+  process.stderr.write(`Written to ${output}\n`);
+}
+
+async function generateMCPCommand(source: string, opts: MCPCommandOptions): Promise<void> {
+  const requestedMode = parseRequestedMode(opts.mode);
+  const maxTools = requireMaxTools(opts.maxTools);
+  const result = await generateMCP(source, {
+    tags: opts.tag.length > 0 ? opts.tag : undefined,
+    include: opts.include.length > 0 ? opts.include : undefined,
+    groupByTag: opts.groupByTag,
+    mode: requestedMode,
+    maxTools,
+  });
+  for (const warning of result.warnings) process.stderr.write(warning);
+  await writeGeneratedOutput(opts.output, result.code);
+}
+
+async function handleMCPCommand(
+  source: string | undefined,
+  opts: MCPCommandOptions
+): Promise<void> {
+  if (opts.list) {
+    listServices();
+    return;
+  }
+  try {
+    await generateMCPCommand(requireSource(source), opts);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`Error: ${message}\n`);
+    process.exit(1);
+  }
+}
+
 generate
   .command("mcp [source]")
   .description("Generate a standalone MCP server JS file")
@@ -39,88 +117,7 @@ generate
   .option("--list", "List available built-in services")
   .option("--mode <mode>", "Tool exposure mode: auto (default), flat, or search")
   .option("--max-tools <n>", "Max flat tools before auto-search or explicit-flat guard (default: 40)", "40")
-  .action(async (source: string | undefined, opts: { output?: string; tag: string[]; include: string[]; groupByTag?: boolean; list?: boolean; mode?: string; maxTools: string }) => {
-    if (opts.list) {
-      for (const [name, entry] of Object.entries(REGISTRY)) {
-        process.stdout.write(`${name.padEnd(16)} ${entry.description}\n`);
-      }
-      return;
-    }
-
-    if (opts.mode !== undefined && opts.mode !== "auto" && opts.mode !== "flat" && opts.mode !== "search") {
-      process.stderr.write("Error: --mode must be auto, flat, or search\n");
-      process.exit(1);
-    }
-    const maxTools = parseMaxTools(opts.maxTools);
-    if (maxTools === null) {
-      process.stderr.write("Error: --max-tools must be a positive integer\n");
-      process.exit(1);
-    }
-
-    if (!source) {
-      process.stderr.write("Error: source argument required. Usage: apidiom generate mcp <service|url|file>\n");
-      process.exit(1);
-    }
-
-    try {
-      const doc = await fetchSpec(source);
-      const model = parseOpenAPI(doc);
-      const serviceName = Object.keys(REGISTRY).find(
-        (k) => REGISTRY[k].url === source || k === source.toLowerCase()
-      );
-      const auth = extractAuth(model, serviceName);
-      const hasUnsupportedAuth = model.authSchemes.some(
-        (s) => s.type === "oauth2" || s.type === "openIdConnect"
-      );
-      if (hasUnsupportedAuth && auth.length === 0) {
-        process.stderr.write(
-          `Warning: "${source}" uses OAuth2/OpenID Connect auth - not supported in generated code. API calls will be unauthenticated and likely return 401.\n`
-        );
-      }
-      const toolOptions = {
-        tags: opts.tag.length > 0 ? opts.tag : undefined,
-        include: opts.include.length > 0 ? opts.include : undefined,
-      };
-      const toolCount = buildToolMetadata(model.endpoints, toolOptions).length;
-      let mode: "flat" | "search" = opts.mode === "search" ? "search" : "flat";
-
-      if ((opts.mode === undefined || opts.mode === "auto") && toolCount > maxTools) {
-        mode = "search";
-        process.stderr.write(
-          `Warning: ${toolCount} tools generated (~${Math.round(toolCount * 380)} tokens in tools/list) - switching to --mode search.\n` +
-          `  Use --mode flat --max-tools ${toolCount} to force a flat tools/list.\n`
-        );
-      }
-
-      if (opts.mode === "flat") {
-        if (toolCount > maxTools) {
-          process.stderr.write(
-            `Error: ${toolCount} tools generated (~${Math.round(toolCount * 380)} tokens in tools/list) - exceeds recommended limit of ${maxTools}.\n` +
-            `  Use --mode search for progressive discovery, or --tag/--include to filter.\n` +
-            `  To force flat mode, raise the guard: --mode flat --max-tools ${toolCount}\n` +
-            `  Example: apidiom generate mcp ${source} --mode search --output server.js\n`
-          );
-          process.exit(1);
-        }
-      }
-      const code = generateMCPServer(model, auth, {
-        ...toolOptions,
-        groupByTag: opts.groupByTag,
-        mode,
-      });
-
-      if (opts.output) {
-        await fs.writeFile(opts.output, code, "utf-8");
-        process.stderr.write(`Written to ${opts.output}\n`);
-      } else {
-        process.stdout.write(code);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      process.stderr.write(`Error: ${msg}\n`);
-      process.exit(1);
-    }
-  });
+  .action(handleMCPCommand);
 
 generate
   .command("schema <source>")
@@ -205,48 +202,69 @@ program
     }
   });
 
-async function runMCPTarget(name: string, t: TargetConfig, dryRun = false): Promise<string> {
-  const source = t.source;
-  const maxTools = t.maxTools ?? 40;
-  const doc = await fetchSpec(source);
-  const model = parseOpenAPI(doc);
-  const serviceName = Object.keys(REGISTRY).find(
-    (k) => REGISTRY[k].url === source || k === source.toLowerCase()
-  );
-  const auth = extractAuth(model, serviceName);
-  const hasUnsupportedAuth = model.authSchemes.some(
-    (s) => s.type === "oauth2" || s.type === "openIdConnect"
-  );
-  if (hasUnsupportedAuth && auth.length === 0) {
-    process.stderr.write(
-      `Warning [${name}]: uses OAuth2/OpenID Connect - API calls will be unauthenticated.\n`
-    );
+type RunCommandOptions = { config?: string; dryRun?: boolean };
+
+async function loadConfig(configPath: string): Promise<ReturnType<typeof parseConfig>> {
+  let raw: string;
+  try {
+    raw = await fs.readFile(configPath, "utf-8");
+  } catch {
+    process.stderr.write(`Error: config file not found: ${configPath}\n`);
+    process.stderr.write("  Run `apidiom init` to create one.\n");
+    process.exit(1);
   }
-  const toolOptions = {
-    tags: t.tags && t.tags.length > 0 ? t.tags : undefined,
-    include: t.include && t.include.length > 0 ? t.include : undefined,
-  };
-  const toolCount = buildToolMetadata(model.endpoints, toolOptions).length;
-  let mode: "flat" | "search" = t.mode === "search" ? "search" : "flat";
-  if (t.mode === "flat" && toolCount > maxTools) {
-    throw new Error(
-      `${toolCount} tools exceeds max-tools limit of ${maxTools} for flat mode. Use mode: search or raise max-tools.`
-    );
+
+  try {
+    return parseConfig(raw);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`Error parsing ${configPath}: ${message}\n`);
+    process.exit(1);
   }
-  if ((t.mode === undefined || t.mode === "auto") && toolCount > maxTools) {
-    mode = "search";
+}
+
+function selectTargets(
+  config: ReturnType<typeof parseConfig>,
+  target: string | undefined
+): Record<string, TargetConfig> {
+  if (target === undefined) return config.targets;
+  const selected = config.targets[target];
+  if (selected) return { [target]: selected };
+
+  const known = Object.keys(config.targets).join(", ");
+  process.stderr.write(`Error: unknown target "${target}". Known targets: ${known}\n`);
+  process.exit(1);
+}
+
+async function executeTargets(
+  targets: Record<string, TargetConfig>,
+  dryRun: boolean
+): Promise<void> {
+  let succeeded = true;
+  for (const [name, target] of Object.entries(targets)) {
+    try {
+      const summary = await runMCPTarget(name, target, dryRun);
+      const arrow = dryRun ? "→ (dry)" : "→ ";
+      process.stdout.write(`✓ ${name.padEnd(16)} ${arrow} ${target.output}  (${summary})\n`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`✗ ${name}: ${message}\n`);
+      succeeded = false;
+    }
   }
-  if (!dryRun) {
-    const code = generateMCPServer(model, auth, {
-      ...toolOptions,
-      groupByTag: t.groupByTag,
-      mode,
-    });
-    const outPath = path.resolve(t.output);
-    await fs.mkdir(path.dirname(outPath), { recursive: true });
-    await fs.writeFile(outPath, code, "utf-8");
-  }
-  return `${toolCount} tools, ${mode} mode`;
+  if (!succeeded) process.exit(1);
+}
+
+async function handleRunCommand(
+  target: string | undefined,
+  opts: RunCommandOptions
+): Promise<void> {
+  const configPath = path.resolve(opts.config ?? "apidiom.yaml");
+  const config = await loadConfig(configPath);
+  const targets = selectTargets(config, target);
+  const dryRun = opts.dryRun ?? false;
+  if (dryRun) process.stderr.write("Dry run — no files will be written.\n");
+  await executeTargets(targets, dryRun);
 }
 
 program
@@ -254,45 +272,6 @@ program
   .description("Generate from apidiom.yaml (all targets, or a single named target)")
   .option("--config <file>", "Path to config file (default: ./apidiom.yaml)")
   .option("--dry-run", "Show what would be generated without writing files")
-  .action(async (target: string | undefined, opts: { config?: string; dryRun?: boolean }) => {
-    const configPath = path.resolve(opts.config ?? "apidiom.yaml");
-    let raw: string;
-    try {
-      raw = await fs.readFile(configPath, "utf-8");
-    } catch {
-      process.stderr.write(`Error: config file not found: ${configPath}\n`);
-      process.stderr.write(`  Run \`apidiom init\` to create one.\n`);
-      process.exit(1);
-    }
-    let config;
-    try {
-      config = parseConfig(raw);
-    } catch (err) {
-      process.stderr.write(`Error parsing ${configPath}: ${err instanceof Error ? err.message : String(err)}\n`);
-      process.exit(1);
-    }
-    if (target && !config.targets[target]) {
-      const known = Object.keys(config.targets).join(", ");
-      process.stderr.write(`Error: unknown target "${target}". Known targets: ${known}\n`);
-      process.exit(1);
-    }
-    const targets = target
-      ? { [target]: config.targets[target] }
-      : config.targets;
-    if (opts.dryRun) process.stderr.write("Dry run — no files will be written.\n");
-    let ok = true;
-    for (const [name, t] of Object.entries(targets)) {
-      try {
-        const summary = await runMCPTarget(name, t, opts.dryRun);
-        const arrow = opts.dryRun ? "→ (dry)" : "→ ";
-        process.stdout.write(`✓ ${name.padEnd(16)} ${arrow} ${t.output}  (${summary})\n`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        process.stderr.write(`✗ ${name}: ${msg}\n`);
-        ok = false;
-      }
-    }
-    if (!ok) process.exit(1);
-  });
+  .action(handleRunCommand);
 
 program.parse(process.argv);

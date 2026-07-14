@@ -25,7 +25,7 @@ export function normalizeToolName(operationId: string): string {
     .replace(/([a-z\d])([A-Z])/g, "$1_$2")
     .toLowerCase()
     .replace(/_+/g, "_")
-    .replace(/^_|_$/g, "");
+    .replace(/(?:^_|_$)/g, "");
   return name || operationId.toLowerCase();
 }
 
@@ -50,7 +50,8 @@ export function enrichDescription(
     (p) => p.required && (p.in === "path" || p.in === "query")
   );
   if (requiredParams.length > 0) {
-    parts.push(`Params: ${requiredParams.map((p) => `${p.name} (required)`).join(", ")}`);
+    const requiredNames = requiredParams.map((param) => `${param.name} (required)`).join(", ");
+    parts.push(`Params: ${requiredNames}`);
   }
 
   return parts.length > 0 ? parts.join(". ") + "." : "";
@@ -61,11 +62,13 @@ function filterEndpoints(
   opts: ToolGenOptions
 ): APIEndpoint[] {
   let result = endpoints;
-  if (opts.tags && opts.tags.length > 0) {
-    result = result.filter((e) => e.tags.some((t) => opts.tags!.includes(t)));
+  const tags = opts.tags;
+  if (tags && tags.length > 0) {
+    result = result.filter((endpoint) => endpoint.tags.some((tag) => tags.includes(tag)));
   }
-  if (opts.include && opts.include.length > 0) {
-    result = result.filter((e) => opts.include!.includes(e.operationId));
+  const include = opts.include;
+  if (include && include.length > 0) {
+    result = result.filter((endpoint) => include.includes(endpoint.operationId));
   }
   return result;
 }

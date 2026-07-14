@@ -1,5 +1,13 @@
 import type { APIEndpoint, APIModel, AuthScheme, OpenAPIParam, RequestBody, Doc } from "../model";
 
+function stringOr(value: unknown, fallback: string): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
 export function parseOpenAPI(doc: Doc): APIModel {
   if (typeof doc["openapi"] !== "string" || !doc["openapi"].startsWith("3")) {
     throw new Error("Only OpenAPI 3.x documents are supported.");
@@ -11,8 +19,7 @@ export function parseOpenAPI(doc: Doc): APIModel {
   const components = (doc["components"] as Doc) ?? {};
   const securitySchemes = (components["securitySchemes"] as Record<string, Doc>) ?? {};
 
-  const serverUrl =
-    servers.length > 0 ? String((servers[0] as Doc)["url"] ?? "") : "";
+  const serverUrl = servers.length > 0 ? stringOr(servers[0]["url"], "") : "";
 
   const endpoints: APIEndpoint[] = [];
   for (const [path, pathItem] of Object.entries(paths)) {
@@ -29,8 +36,8 @@ export function parseOpenAPI(doc: Doc): APIModel {
   );
 
   return {
-    title: String(info["title"] ?? "API"),
-    version: String(info["version"] ?? "0.0.0"),
+    title: stringOr(info["title"], "API"),
+    version: stringOr(info["version"], "0.0.0"),
     serverUrl,
     endpoints,
     authSchemes,
@@ -41,10 +48,10 @@ function parseEndpoint(path: string, method: string, op: Doc, pathParams: Doc[] 
   const opParams = (op["parameters"] as Doc[]) ?? [];
   const rawParams = mergeParameters(pathParams, opParams);
   const parameters: OpenAPIParam[] = rawParams.map((p) => ({
-    name: String(p["name"] ?? ""),
+    name: stringOr(p["name"], ""),
     in: p["in"] as OpenAPIParam["in"],
     required: Boolean(p["required"] ?? false),
-    description: p["description"] ? String(p["description"]) : undefined,
+    description: optionalString(p["description"]),
     schema: (p["schema"] as Record<string, unknown>) ?? {},
   }));
 
@@ -56,22 +63,22 @@ function parseEndpoint(path: string, method: string, op: Doc, pathParams: Doc[] 
     const schema = jsonContent ? ((jsonContent["schema"] as Record<string, unknown>) ?? {}) : {};
     requestBody = {
       required: Boolean(rb["required"] ?? false),
-      description: rb["description"] ? String(rb["description"]) : undefined,
+      description: optionalString(rb["description"]),
       schema,
     };
   }
 
-  const operationId =
-    op["operationId"]
-      ? String(op["operationId"])
-      : `${method.toLowerCase()}_${path.replace(/[^a-zA-Z0-9]/g, "_")}`;
+  const operationId = stringOr(
+    op["operationId"],
+    `${method.toLowerCase()}_${path.replace(/[^a-zA-Z0-9]/g, "_")}`
+  );
 
   return {
     path,
     method,
     operationId,
-    summary: op["summary"] ? String(op["summary"]) : undefined,
-    description: op["description"] ? String(op["description"]) : undefined,
+    summary: optionalString(op["summary"]),
+    description: optionalString(op["description"]),
     tags: (op["tags"] as string[]) ?? [],
     parameters,
     requestBody,
@@ -81,7 +88,7 @@ function parseEndpoint(path: string, method: string, op: Doc, pathParams: Doc[] 
 function mergeParameters(pathParams: Doc[], opParams: Doc[]): Doc[] {
   const merged = new Map<string, Doc>();
   for (const param of pathParams.concat(opParams)) {
-    merged.set(`${String(param["in"] ?? "")}:${String(param["name"] ?? "")}`, param);
+    merged.set(`${stringOr(param["in"], "")}:${stringOr(param["name"], "")}`, param);
   }
   return Array.from(merged.values());
 }
@@ -90,8 +97,8 @@ function parseAuthScheme(name: string, scheme: Doc): AuthScheme {
   return {
     name,
     type: scheme["type"] as AuthScheme["type"],
-    scheme: scheme["scheme"] ? String(scheme["scheme"]) : undefined,
+    scheme: optionalString(scheme["scheme"]),
     apiKeyIn: scheme["in"] as AuthScheme["apiKeyIn"] | undefined,
-    apiKeyHeaderName: scheme["name"] ? String(scheme["name"]) : undefined,
+    apiKeyHeaderName: optionalString(scheme["name"]),
   };
 }

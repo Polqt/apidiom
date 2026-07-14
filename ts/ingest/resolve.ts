@@ -2,6 +2,10 @@ import type { Doc } from "../model";
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete", "head", "options"];
 
+function isDoc(value: unknown): value is Doc {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export function resolveRefs(doc: Doc): Doc {
   const paths = doc["paths"] as Record<string, Doc> | undefined;
   if (!paths) return doc;
@@ -10,23 +14,26 @@ export function resolveRefs(doc: Doc): Doc {
     const parts = ref.slice(2).split("/");
     let node: unknown = doc;
     for (const part of parts) {
-      if (typeof node !== "object" || node === null) return undefined;
-      node = (node as Doc)[decodeURIComponent(part.replace(/~1/g, "/").replace(/~0/g, "~"))];
+      if (!isDoc(node)) return undefined;
+      node = node[decodeURIComponent(part.replace(/~1/g, "/").replace(/~0/g, "~"))];
     }
     return node;
   }
 
   const warnedExternalRefs = new Set<string>();
 
+  function warnExternalRef(ref: string): void {
+    if (warnedExternalRefs.has(ref)) return;
+    warnedExternalRefs.add(ref);
+    process.stderr.write(`Warning: external $ref "${ref}" not supported — skipped.\n`);
+  }
+
   function deref(node: unknown): unknown {
-    if (typeof node !== "object" || node === null) return node;
-    const ref = (node as Doc)["$ref"];
+    if (!isDoc(node)) return node;
+    const ref = node["$ref"];
     if (typeof ref !== "string") return node;
     if (ref.startsWith("#/")) return lookup(ref) ?? node;
-    if (!warnedExternalRefs.has(ref)) {
-      warnedExternalRefs.add(ref);
-      process.stderr.write(`Warning: external $ref "${ref}" not supported — skipped.\n`);
-    }
+    warnExternalRef(ref);
     return node;
   }
 
@@ -36,79 +43,80 @@ export function resolveRefs(doc: Doc): Doc {
     if (Array.isArray(node)) {
       return node.map((item) => resolveSchema(item, activeRefs));
     }
-    if (typeof node !== "object" || node === null) return node;
+    if (!isDoc(node)) return node;
 
-    const schema = node as Doc;
-    const ref = schema["$ref"];
+    const ref = node["$ref"];
     if (typeof ref === "string" && !ref.startsWith("#/")) {
-      if (!warnedExternalRefs.has(ref)) {
-        warnedExternalRefs.add(ref);
-        process.stderr.write(`Warning: external $ref "${ref}" not supported — skipped.\n`);
-      }
+      warnExternalRef(ref);
       return node;
     }
     if (typeof ref === "string" && ref.startsWith("#/")) {
-      if (activeRefs.has(ref)) return {};
-      if (Object.keys(schema).length === 1 && schemaCache.has(ref)) {
-        return schemaCache.get(ref);
-      }
-
-      const target = lookup(ref);
-      if (typeof target !== "object" || target === null) return node;
-
-      const nextRefs = new Set(activeRefs);
-      nextRefs.add(ref);
-      const siblings = Object.fromEntries(
-        Object.entries(schema).filter(([key]) => key !== "$ref")
-      );
-      const resolved = resolveSchema({ ...(target as Doc), ...siblings }, nextRefs);
-      if (Object.keys(schema).length === 1) schemaCache.set(ref, resolved);
-      return resolved;
+      return resolveLocalSchemaRef(node, ref, activeRefs);
     }
 
     return Object.fromEntries(
-      Object.entries(schema).map(([key, value]) => [key, resolveSchema(value, activeRefs)])
+      Object.entries(node).map(([key, value]) => [key, resolveSchema(value, activeRefs)])
     );
+  }
+
+  function resolveLocalSchemaRef(
+    schema: Doc,
+    ref: string,
+    activeRefs: Set<string>
+  ): unknown {
+    if (activeRefs.has(ref)) return {};
+    if (Object.keys(schema).length === 1 && schemaCache.has(ref)) {
+      return schemaCache.get(ref);
+    }
+
+    const target = lookup(ref);
+    if (!isDoc(target)) return schema;
+
+    const nextRefs = new Set(activeRefs);
+    nextRefs.add(ref);
+    const siblings = Object.fromEntries(
+      Object.entries(schema).filter(([key]) => key !== "$ref")
+    );
+    const resolved = resolveSchema({ ...target, ...siblings }, nextRefs);
+    if (Object.keys(schema).length === 1) schemaCache.set(ref, resolved);
+    return resolved;
   }
 
   function resolveParameter(node: unknown): unknown {
     const parameter = deref(node);
-    if (typeof parameter !== "object" || parameter === null) return parameter;
-    const value = parameter as Doc;
-    return value["schema"] === undefined
-      ? value
-      : { ...value, schema: resolveSchema(value["schema"]) };
+    if (!isDoc(parameter)) return parameter;
+    return parameter["schema"] === undefined
+      ? parameter
+      : { ...parameter, schema: resolveSchema(parameter["schema"]) };
   }
 
   // Deref the requestBody envelope, then deep-resolve each content type's schema
   // so body fields survive as concrete properties instead of an unresolved $ref.
   function resolveRequestBody(node: unknown): unknown {
     const body = deref(node);
-    if (typeof body !== "object" || body === null) return body;
-    const value = body as Doc;
-    const content = value["content"];
-    if (typeof content !== "object" || content === null) return value;
+    if (!isDoc(body)) return body;
+    const content = body["content"];
+    if (!isDoc(content)) return body;
     const resolvedContent = Object.fromEntries(
-      Object.entries(content as Record<string, unknown>).map(([mediaType, media]) => {
-        if (typeof media !== "object" || media === null) return [mediaType, media];
-        const m = media as Doc;
-        return m["schema"] === undefined
-          ? [mediaType, m]
-          : [mediaType, { ...m, schema: resolveSchema(m["schema"]) }];
+      Object.entries(content).map(([mediaType, media]) => {
+        if (!isDoc(media)) return [mediaType, media];
+        return media["schema"] === undefined
+          ? [mediaType, media]
+          : [mediaType, { ...media, schema: resolveSchema(media["schema"]) }];
       })
     );
-    return { ...value, content: resolvedContent };
+    return { ...body, content: resolvedContent };
   }
 
   const resolvedPaths: Record<string, Doc> = {};
 
   for (const [path, pathItem] of Object.entries(paths)) {
     if (typeof pathItem !== "object" || pathItem === null) {
-      resolvedPaths[path] = pathItem as Doc;
+      resolvedPaths[path] = pathItem;
       continue;
     }
 
-    const pi = pathItem as Doc;
+    const pi = pathItem;
     const sharedParams =
       (pi["parameters"] as unknown[] | undefined)?.map(resolveParameter) ?? [];
     const resolved: Doc = { ...pi };

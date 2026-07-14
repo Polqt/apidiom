@@ -14,6 +14,56 @@ export interface ApidiomConfig {
   targets: Record<string, TargetConfig>;
 }
 
+function isTargetMode(value: unknown): value is TargetConfig["mode"] {
+  return value === "flat" || value === "search" || value === "auto";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringArray(value: unknown): string[] | undefined {
+  if (
+    !Array.isArray(value) ||
+    !value.every((item): item is string => typeof item === "string")
+  ) {
+    return undefined;
+  }
+  return value;
+}
+
+function parseTarget(name: string, entry: unknown): TargetConfig {
+  if (!isRecord(entry)) {
+    throw new Error(`Target "${name}" must be an object`);
+  }
+  const target = entry;
+
+  if (typeof target.source !== "string" || !target.source) {
+    throw new Error(`Target "${name}" missing required field: source`);
+  }
+  if (typeof target.output !== "string" || !target.output) {
+    throw new Error(`Target "${name}" missing required field: output`);
+  }
+  if (target.mode !== undefined && !isTargetMode(target.mode)) {
+    const invalidMode =
+      typeof target.mode === "string" ? `"${target.mode}"` : `of type ${typeof target.mode}`;
+    throw new Error(
+      `Target "${name}" has invalid mode ${invalidMode}. Must be flat, search, or auto`
+    );
+  }
+
+  return {
+    source: target.source,
+    output: target.output,
+    mode: isTargetMode(target.mode) ? target.mode : undefined,
+    tags: stringArray(target.tags),
+    include: stringArray(target.include),
+    groupByTag:
+      typeof target["group-by-tag"] === "boolean" ? target["group-by-tag"] : undefined,
+    maxTools: typeof target["max-tools"] === "number" ? target["max-tools"] : undefined,
+  };
+}
+
 export function parseConfig(raw: string): ApidiomConfig {
   const doc = yaml.load(raw) as Record<string, unknown>;
 
@@ -29,29 +79,7 @@ export function parseConfig(raw: string): ApidiomConfig {
   const targets: Record<string, TargetConfig> = {};
 
   for (const [name, entry] of Object.entries(rawTargets)) {
-    const t = entry as Record<string, unknown>;
-
-    if (typeof t.source !== "string" || !t.source) {
-      throw new Error(`Target "${name}" missing required field: source`);
-    }
-    if (typeof t.output !== "string" || !t.output) {
-      throw new Error(`Target "${name}" missing required field: output`);
-    }
-
-    const mode = t.mode as string | undefined;
-    if (mode !== undefined && mode !== "flat" && mode !== "search" && mode !== "auto") {
-      throw new Error(`Target "${name}" has invalid mode "${mode}". Must be flat, search, or auto`);
-    }
-
-    targets[name] = {
-      source: t.source,
-      output: t.output,
-      mode: mode as TargetConfig["mode"],
-      tags: Array.isArray(t.tags) ? (t.tags as string[]) : undefined,
-      include: Array.isArray(t.include) ? (t.include as string[]) : undefined,
-      groupByTag: typeof t["group-by-tag"] === "boolean" ? t["group-by-tag"] : undefined,
-      maxTools: typeof t["max-tools"] === "number" ? t["max-tools"] : undefined,
-    };
+    targets[name] = parseTarget(name, entry);
   }
 
   return { targets };

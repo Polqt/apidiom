@@ -102,4 +102,59 @@ describe("parseOpenAPI", () => {
   it("throws on non-OpenAPI-3 document", () => {
     expect(() => parseOpenAPI({ swagger: "2.0" })).toThrow(/OpenAPI 3/);
   });
+
+  it("uses safe defaults for non-string OpenAPI text fields", () => {
+    const model = parseOpenAPI({
+      openapi: "3.0.3",
+      info: { title: { unsafe: true }, version: [1, 0] },
+      servers: [{ url: { host: "api.example.com" } }],
+      paths: {
+        "/pets": {
+          post: {
+            operationId: { unsafe: true },
+            summary: { unsafe: true },
+            description: ["unsafe"],
+            parameters: [
+              {
+                name: { unsafe: true },
+                in: "query",
+                description: { unsafe: true },
+              },
+            ],
+            requestBody: {
+              description: { unsafe: true },
+              content: { "application/json": { schema: { type: "object" } } },
+            },
+          },
+        },
+      },
+      components: {
+        securitySchemes: {
+          apiKey: {
+            type: "apiKey",
+            in: "header",
+            scheme: { unsafe: true },
+            name: { unsafe: true },
+          },
+        },
+      },
+    });
+
+    expect(model).toMatchObject({
+      title: "API",
+      version: "0.0.0",
+      serverUrl: "",
+      endpoints: [
+        {
+          operationId: "post__pets",
+          summary: undefined,
+          description: undefined,
+          parameters: [{ name: "", description: undefined }],
+          requestBody: { description: undefined },
+        },
+      ],
+      authSchemes: [{ scheme: undefined, apiKeyHeaderName: undefined }],
+    });
+    expect(JSON.stringify(model)).not.toContain("[object Object]");
+  });
 });
